@@ -19,7 +19,7 @@ export class WinsService {
         userId,
         title: data.title,
         details: data.details,
-        pillar: data.pillar as any,
+        pillar: data.pillar || undefined,
         date: data.date ? new Date(data.date) : new Date(),
       },
     })

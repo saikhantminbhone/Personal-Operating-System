@@ -282,12 +282,13 @@ export default function KnowledgePage() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-start gap-2 mb-3 flex-shrink-0">
-        {/* Mobile back button */}
+        {/* Back button — closes editor on mobile, deselects note on desktop */}
         <button
-          onClick={() => { setMobileEditorOpen(false); setIsEditing(false) }}
-          className="sm:hidden flex items-center gap-1 text-os-muted hover:text-os-text text-xs font-mono transition-colors pt-0.5 flex-shrink-0"
+          onClick={() => { setMobileEditorOpen(false); setIsEditing(false); setActiveNote(null) }}
+          className="flex items-center gap-1 text-os-muted hover:text-os-text text-xs font-mono transition-colors pt-0.5 flex-shrink-0"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Back</span>
         </button>
 
         <div className="flex-1 min-w-0">
