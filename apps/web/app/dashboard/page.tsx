@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { useDashboardStats, useGoalsByPillar } from '@/hooks/useAnalytics'
 import { useFocusQueue, useCompleteTask } from '@/hooks/useTasks'
 import { useGoals } from '@/hooks/useGoals'
@@ -8,15 +9,49 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Button } from '@/components/ui/Button'
 import { ENERGY_META, PILLAR_META, progressColor } from '@/lib/utils'
-import { Target, CheckSquare, Flame, Trophy, Plus } from 'lucide-react'
+import { Target, CheckSquare, Flame, Trophy, Plus, BookOpen } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { journalApi, winsApi } from '@/lib/api'
 
 export default function DashboardPage() {
+  const qc = useQueryClient()
   const { data: stats } = useDashboardStats()
   const { data: focusQueue } = useFocusQueue(stats?.energyLevel ?? undefined)
   const { data: goals } = useGoals({ status: 'ACTIVE' })
   const { data: briefing } = useAiBriefing()
   const { setModal, showToast } = useAppStore()
   const completeTask = useCompleteTask()
+
+  const [winTitle, setWinTitle] = useState('')
+  const [journalText, setJournalText] = useState('')
+
+  const { data: todayJournal } = useQuery<any>({
+    queryKey: ['journal', 'today'],
+    queryFn: () => journalApi.today(),
+    staleTime: 1000 * 60 * 5,
+  })
+
+  const logWin = useMutation({
+    mutationFn: () => winsApi.create({ title: winTitle }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wins'] })
+      qc.invalidateQueries({ queryKey: ['analytics', 'dashboard'] })
+      setWinTitle('')
+      showToast('Win logged! 🏆')
+    },
+    onError: () => showToast('Failed to log win', 'error'),
+  })
+
+  const saveJournal = useMutation({
+    mutationFn: () => todayJournal?.id
+      ? journalApi.update(todayJournal.id, { content: journalText })
+      : journalApi.create({ content: journalText }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['journal'] })
+      showToast('Journal saved ✓')
+    },
+    onError: () => showToast('Failed to save journal', 'error'),
+  })
 
   const statCards = [
     { label: 'Day Streak', value: stats?.streakCount ?? 0, unit: 'days', color: '#f97316', icon: Flame },
@@ -157,6 +192,48 @@ export default function DashboardPage() {
             <div className="text-[9px] font-mono tracking-widest uppercase text-os-muted">{label}</div>
           </Card>
         ))}
+      </div>
+
+      {/* Win + Journal quick actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle><Trophy className="w-3.5 h-3.5 inline mr-1 text-yellow-400" />Log a Win</CardTitle>
+          </CardHeader>
+          <div className="flex gap-2 mt-2">
+            <input
+              value={winTitle}
+              onChange={e => setWinTitle(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && winTitle.trim() && logWin.mutate()}
+              placeholder="What did you accomplish today?"
+              className="flex-1 os-input text-xs"
+            />
+            <Button size="sm" loading={logWin.isPending} disabled={!winTitle.trim()} onClick={() => logWin.mutate()}>
+              <Plus className="w-3 h-3" />
+            </Button>
+          </div>
+          <p className="text-[9px] font-mono text-os-muted/60 mt-2">Press Enter or click + to log</p>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle><BookOpen className="w-3.5 h-3.5 inline mr-1 text-blue-400" />Today's Reflection</CardTitle>
+            {todayJournal && <span className="text-[9px] font-mono text-os-success">saved</span>}
+          </CardHeader>
+          <textarea
+            value={journalText || todayJournal?.content || ''}
+            onChange={e => setJournalText(e.target.value)}
+            placeholder="How's your day going? Any thoughts, wins, or challenges..."
+            rows={3}
+            className="w-full os-input resize-none text-xs font-mono mt-2 leading-relaxed"
+          />
+          <Button size="sm" variant="ghost" className="mt-2"
+            loading={saveJournal.isPending}
+            disabled={!(journalText || todayJournal?.content)}
+            onClick={() => saveJournal.mutate()}>
+            Save Reflection
+          </Button>
+        </Card>
       </div>
     </div>
   )

@@ -22,6 +22,8 @@ import { SearchModule } from './modules/search/search.module'
 import { WebsocketsModule } from './modules/websockets/websockets.module'
 import { OrganizationsModule } from './modules/organizations/organizations.module'
 import { PublicApiModule } from './modules/public-api/public-api.module'
+import { JournalModule } from './modules/journal/journal.module'
+import { WinsModule } from './modules/wins/wins.module'
 
 @Module({
   imports: [
@@ -43,6 +45,7 @@ import { PublicApiModule } from './modules/public-api/public-api.module'
     HabitsModule, FinanceModule, KnowledgeModule, ProjectsModule,
     BillingModule, NotificationsModule, SearchModule, WebsocketsModule,
     OrganizationsModule, PublicApiModule,
+    JournalModule, WinsModule,
   ],
 })
 export class AppModule {}

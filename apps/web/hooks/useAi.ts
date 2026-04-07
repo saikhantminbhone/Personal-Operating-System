@@ -81,10 +81,13 @@ export function useAiChat() {
       // Fallback to non-streaming on error
       try {
         const result: any = await aiApi.chat(message, history)
-        const assistantMsg = result.conversationHistory?.slice(-1)[0]
         setHistory(result.conversationHistory || newHistory)
         setStreamingText('')
-      } catch {}
+      } catch (fallbackErr: any) {
+        const msg = fallbackErr?.response?.data?.message || 'Failed to get a response. Please try again.'
+        setHistory([...newHistory, { role: 'assistant', content: `⚠ ${msg}` }])
+        setStreamingText('')
+      }
     } finally {
       setIsStreaming(false)
       setStreamingText('')

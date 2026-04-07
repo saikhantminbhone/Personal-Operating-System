@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Target, CheckSquare, BookOpen,
   FolderKanban, BarChart3, Bot, Settings, LogOut,
   ChevronLeft, ChevronRight, Hexagon, PiggyBank,
-  Repeat2, CreditCard, Users, Key, X
+  Repeat2, CreditCard, Users, Key, X, CalendarDays
 } from 'lucide-react'
 
 const NAV_MAIN = [
@@ -18,6 +18,7 @@ const NAV_MAIN = [
   { href: '/dashboard/goals',      icon: Target,          label: 'Goals' },
   { href: '/dashboard/tasks',      icon: CheckSquare,     label: 'Tasks' },
   { href: '/dashboard/habits',     icon: Repeat2,         label: 'Habits' },
+  { href: '/dashboard/planner',    icon: CalendarDays,    label: 'Planner' },
   { href: '/dashboard/knowledge',  icon: BookOpen,        label: 'Knowledge' },
   { href: '/dashboard/finance',    icon: PiggyBank,       label: 'Finance' },
   { href: '/dashboard/projects',   icon: FolderKanban,    label: 'Projects' },

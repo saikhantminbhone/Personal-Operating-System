@@ -226,3 +226,22 @@ export const apiKeysApi = {
   revoke: (id: string) => api.delete(`/api-keys/${id}`),
   scopes: () => api.get('/api-keys/scopes'),
 }
+
+// ── JOURNAL ───────────────────────────────────────────────────────────────────
+export const journalApi = {
+  list: (limit?: number) => api.get('/journal', { params: { limit } }),
+  today: () => api.get('/journal/today'),
+  create: (data: { content: string; mood?: number; date?: string }) =>
+    api.post('/journal', data),
+  update: (id: string, data: { content?: string; mood?: number }) =>
+    api.patch(`/journal/${id}`, data),
+  delete: (id: string) => api.delete(`/journal/${id}`),
+}
+
+// ── WINS ──────────────────────────────────────────────────────────────────────
+export const winsApi = {
+  list: (limit?: number) => api.get('/wins', { params: { limit } }),
+  create: (data: { title: string; details?: string; pillar?: string }) =>
+    api.post('/wins', data),
+  delete: (id: string) => api.delete(`/wins/${id}`),
+}

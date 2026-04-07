@@ -1,8 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { api, authApi } from '@/lib/api'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input, Select } from '@/components/ui/Input'
@@ -27,10 +27,35 @@ const SECTIONS = [
 ]
 
 export default function SettingsPage() {
-  const { data: session } = useSession()
+  const { data: session, update: updateSession } = useSession()
   const { showToast } = useAppStore()
+  const qc = useQueryClient()
   const [activeSection, setActiveSection] = useState('profile')
-  const [profileForm, setProfileForm] = useState({ name: session?.user?.name || '', timezone: 'Asia/Bangkok' })
+  const [profileForm, setProfileForm] = useState({ name: '', timezone: 'Asia/Bangkok' })
+
+  const { data: profile } = useQuery<any>({
+    queryKey: ['users', 'profile'],
+    queryFn: () => authApi.updateProfile ? api.get('/users/profile') : null,
+    staleTime: 1000 * 60 * 5,
+  })
+
+  useEffect(() => {
+    if (profile) {
+      setProfileForm({ name: profile.name || '', timezone: profile.timezone || 'Asia/Bangkok' })
+    } else if (session?.user?.name) {
+      setProfileForm(f => ({ ...f, name: session.user!.name! }))
+    }
+  }, [profile, session])
+
+  const updateProfile = useMutation({
+    mutationFn: (data: any) => api.patch('/users/profile', data),
+    onSuccess: (data: any) => {
+      qc.invalidateQueries({ queryKey: ['users', 'profile'] })
+      qc.invalidateQueries({ queryKey: ['analytics', 'dashboard'] })
+      showToast('Profile saved ✓')
+    },
+    onError: () => showToast('Failed to save profile', 'error'),
+  })
 
   const { data: stats } = useQuery<any>({ queryKey: ['analytics', 'dashboard'], queryFn: () => api.get('/analytics/dashboard') })
 
@@ -117,7 +142,10 @@ export default function SettingsPage() {
                   onChange={e => setProfileForm(f => ({ ...f, timezone: e.target.value }))}>
                   {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
                 </Select>
-                <Button onClick={() => showToast('Profile saved ✓')}>Save Changes</Button>
+                <Button
+                  loading={updateProfile.isPending}
+                  onClick={() => updateProfile.mutate(profileForm)}
+                >Save Changes</Button>
               </div>
             </Card>
 
