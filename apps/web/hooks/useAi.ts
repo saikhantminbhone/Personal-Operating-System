@@ -66,13 +66,13 @@ export function useAiChat() {
           if (!line.startsWith('data: ')) continue
           try {
             const data = JSON.parse(line.slice(6))
-            if (data.token) {
-              accumulated += data.token
+            if (data.type === 'chunk' && data.text) {
+              accumulated += data.text
               setStreamingText(accumulated)
-            } else if (data.done) {
-              const finalText = data.fullText || accumulated
+            } else if (data.type === 'done') {
+              const finalHistory = data.conversationHistory || [...newHistory, { role: 'assistant', content: accumulated }]
               setStreamingText('')
-              setHistory([...newHistory, { role: 'assistant', content: finalText }])
+              setHistory(finalHistory)
             }
           } catch {}
         }
