@@ -1,0 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { @apply bg-bg text-text font-sans; -webkit-font-smoothing: antialiased; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #0D1520; }
+  ::-webkit-scrollbar-thumb { background: rgba(100,255,218,0.2); border-radius: 2px; }
+  ::selection { background: rgba(100,255,218,0.2); }
+}

@@ -1,0 +1,6 @@
+packages:
+  - 'apps/api'
+  - 'apps/web'
+  - 'apps/marketing'
+  - 'packages/shared'
+  - 'packages/config'

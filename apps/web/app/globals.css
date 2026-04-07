@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-os-bg text-os-text;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #0D1520; }
+  ::-webkit-scrollbar-thumb { background: rgba(100,255,218,0.2); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(100,255,218,0.4); }
+  ::selection { background: rgba(100,255,218,0.2); }
+  input, select, textarea, button { font-family: inherit; }
+}
+
+@layer components {
+  .os-card {
+    @apply bg-os-surface border border-os-border rounded-xl p-4 sm:p-5;
+  }
+  .os-label {
+    @apply text-[10px] font-mono tracking-[0.2em] uppercase text-os-accent;
+  }
+  .os-input {
+    @apply w-full bg-white/[0.03] border border-os-border text-os-text
+           px-3 py-2.5 rounded-lg font-mono text-sm outline-none
+           focus:border-os-accent/40 focus:ring-1 focus:ring-os-accent/20
+           transition-all duration-150 placeholder:text-os-muted/50
+           min-h-[44px];
+  }
+  .os-select {
+    @apply w-full bg-os-surface border border-os-border text-os-text
+           px-3 py-2.5 rounded-lg font-mono text-sm outline-none
+           focus:border-os-accent/40 cursor-pointer min-h-[44px];
+  }
+}
+
+/* Animation classes */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+.animate-slide-up { animation: slideUp 0.3s ease-out; }
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-pulse { animation: pulse 2s ease-in-out infinite; }
+
+/* Touch targets for mobile */
+.touch-manipulation { touch-action: manipulation; }
+
+/* Safe area for mobile browsers */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }

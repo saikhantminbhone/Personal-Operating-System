@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install:*)",
+      "Bash(npm list:*)",
+      "Bash(/usr/local/bin/pnpm --version)",
+      "Bash(/opt/homebrew/bin/pnpm --version)",
+      "Bash(docker info:*)",
+      "Bash(docker compose:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/knowledge/notes)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/api/knowledge/notes)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4000/knowledge/notes)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/knowledge/notes)",
+      "Bash(curl -s \"http://localhost:3001/api/v1/knowledge/notes\" -H \"Authorization: Bearer test\")",
+      "Bash(node -e \":*)",
+      "Bash(/usr/local/bin/node --version)",
+      "Bash(/opt/homebrew/bin/node --version)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlZjY0NTllYi00YjA0LTRjZmUtYWZmNS0yYWY3NmYwMWZjZWEiLCJlbWFpbCI6ImRlYnVndGVzdEB0ZXN0LmNvbSIsImlhdCI6MTc3NTU0MTYxMSwiZXhwIjoxNzc1NTQyNTExfQ.Tyx5ZR7TAbC1KorLdV3vHOTmjxgvdwgPORisGJp0rkA\")",
+      "Bash(__NEW_LINE_74cdecfc6deae8c9__ echo:*)",
+      "Bash(curl -s \"http://localhost:3001/api/v1/knowledge/notes\" -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(curl -s \"http://localhost:3001/api/v1/knowledge/collections\" -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(curl -s \"http://localhost:3001/api/v1/knowledge/notes/stats\" -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(curl -s \"http://localhost:3001/api/v1/health\")",
+      "Bash(ls /Users/saikhantminbhone/Code/saikhant-labs-os/apps/api/*.tsbuildinfo)",
+      "Bash(/usr/local/bin/node node_modules/typescript/bin/tsc)"
+    ]
+  }
+}

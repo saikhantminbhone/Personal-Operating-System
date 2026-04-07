@@ -1,0 +1,617 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GoalPillar {
+  GROWTH
+  HEALTH
+  WORK
+  PERSONAL
+  FINANCE
+}
+
+enum GoalStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum HabitFrequency {
+  DAILY
+  WEEKLY
+  CUSTOM
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum AccountType {
+  CASH
+  BANK
+  SAVINGS
+  INVESTMENT
+  CRYPTO
+  CREDIT
+}
+
+enum MetricType {
+  PERCENTAGE
+  NUMBER
+  BOOLEAN
+  CURRENCY
+}
+
+enum UserPlan {
+  FREE
+  PRO
+  TEAM
+  ENTERPRISE
+}
+
+enum NoteType {
+  NOTE
+  DAILY
+  MEETING
+  BOOK_REVIEW
+  PROJECT_RETRO
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  HABIT_REMINDER
+  GOAL_MILESTONE
+  TASK_DUE
+  STREAK_AT_RISK
+  WEEKLY_SUMMARY
+  AI_INSIGHT
+  SYSTEM
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String
+  avatarUrl     String?
+  timezone      String    @default("Asia/Bangkok")
+  energyLevel   Int?
+  streakCount   Int       @default(0)
+  lastCheckinAt DateTime?
+  plan          UserPlan  @default(FREE)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  googleId      String?   @unique
+  passwordHash  String?
+
+  goals          Goal[]
+  tasks          Task[]
+  habits         Habit[]
+  habitLogs      HabitLog[]
+  accounts       Account[]
+  transactions   Transaction[]
+  notes          Note[]
+  collections    Collection[]
+  projects       Project[]
+  journalEntries JournalEntry[]
+  wins           Win[]
+  aiMessages     AiMessage[]
+  subscription   Subscription?
+  notifications  Notification[]
+  apiKeys        ApiKey[]
+  orgMembers     OrgMember[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Goal {
+  id           String     @id @default(uuid())
+  userId       String
+  title        String
+  description  String?
+  pillar       GoalPillar
+  status       GoalStatus @default(ACTIVE)
+  progress     Int        @default(0)
+  targetDate   DateTime?
+  parentGoalId String?
+  aiInsight    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentGoal Goal?       @relation("GoalHierarchy", fields: [parentGoalId], references: [id])
+  subGoals   Goal[]      @relation("GoalHierarchy")
+  keyResults KeyResult[]
+  tasks      Task[]
+  projects   Project[]
+
+  @@index([userId, status])
+  @@index([userId, pillar])
+  @@map("goals")
+}
+
+model KeyResult {
+  id           String     @id @default(uuid())
+  goalId       String
+  title        String
+  metricType   MetricType
+  currentValue Float      @default(0)
+  targetValue  Float
+  unit         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@map("key_results")
+}
+
+model Task {
+  id               String       @id @default(uuid())
+  userId           String
+  goalId           String?
+  projectId        String?
+  title            String
+  description      String?
+  status           TaskStatus   @default(TODO)
+  priority         TaskPriority @default(MEDIUM)
+  energyRequired   Int          @default(2)
+  estimatedMinutes Int?
+  dueDate          DateTime?
+  completedAt      DateTime?
+  recurrenceRule   String?
+  tags             String[]     @default([])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal    Goal?    @relation(fields: [goalId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([userId, status])
+  @@index([userId, priority])
+  @@index([userId, dueDate])
+  @@map("tasks")
+}
+
+model Habit {
+  id             String         @id @default(uuid())
+  userId         String
+  title          String
+  description    String?
+  frequency      HabitFrequency @default(DAILY)
+  frequencyDays  Int[]          @default([])
+  targetCount    Int            @default(1)
+  currentStreak  Int            @default(0)
+  longestStreak  Int            @default(0)
+  totalCompleted Int            @default(0)
+  color          String?
+  icon           String?
+  order          Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  archivedAt     DateTime?
+
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs HabitLog[]
+
+  @@index([userId])
+  @@map("habits")
+}
+
+model HabitLog {
+  id          String   @id @default(uuid())
+  habitId     String
+  userId      String
+  completedAt DateTime @default(now())
+  note        String?
+
+  habit Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, completedAt])
+  @@index([habitId, completedAt])
+  @@map("habit_logs")
+}
+
+model Account {
+  id           String      @id @default(uuid())
+  userId       String
+  name         String
+  type         AccountType
+  currencyCode String      @default("USD")
+  balanceCents Int         @default(0)
+  color        String?
+  icon         String?
+  isDefault    Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model FinanceCategory {
+  id        String   @id @default(uuid())
+  userId    String?
+  name      String
+  icon      String?
+  color     String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  transactions Transaction[]
+
+  @@map("finance_categories")
+}
+
+model Transaction {
+  id              String          @id @default(uuid())
+  accountId       String
+  userId          String
+  categoryId      String?
+  amountCents     Int
+  currencyCode    String          @default("USD")
+  type            TransactionType
+  description     String?
+  transactionDate DateTime
+  aiCategorized   Boolean         @default(false)
+  recurringId     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  account  Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category FinanceCategory? @relation(fields: [categoryId], references: [id])
+
+  @@index([userId, transactionDate])
+  @@index([accountId])
+  @@map("transactions")
+}
+
+model Collection {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  color       String?
+  icon        String?
+  parentId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent   Collection?  @relation("CollectionHierarchy", fields: [parentId], references: [id])
+  children Collection[] @relation("CollectionHierarchy")
+  notes    Note[]
+
+  @@index([userId])
+  @@map("collections")
+}
+
+model Note {
+  id           String    @id @default(uuid())
+  userId       String
+  collectionId String?
+  title        String
+  content      String?
+  type         NoteType  @default(NOTE)
+  tags         String[]  @default([])
+  sourceUrl    String?
+  pinned       Boolean   @default(false)
+  aiSummary    String?
+  wordCount    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collection Collection? @relation(fields: [collectionId], references: [id])
+
+  @@index([userId])
+  @@index([userId, collectionId])
+  @@map("notes")
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  userId      String
+  goalId      String?
+  title       String
+  description String?
+  status      ProjectStatus @default(PLANNING)
+  color       String?
+  startDate   DateTime?
+  targetDate  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal    Goal?    @relation(fields: [goalId], references: [id])
+  tasks   Task[]
+  sprints Sprint[]
+
+  @@index([userId])
+  @@map("projects")
+}
+
+model Sprint {
+  id        String   @id @default(uuid())
+  projectId String
+  title     String
+  goal      String?
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("sprints")
+}
+
+model JournalEntry {
+  id        String   @id @default(uuid())
+  userId    String
+  content   String
+  mood      Int?
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("journal_entries")
+}
+
+model Win {
+  id        String      @id @default(uuid())
+  userId    String
+  title     String
+  details   String?
+  pillar    GoalPillar?
+  date      DateTime    @default(now())
+  createdAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("wins")
+}
+
+model AiMessage {
+  id        String   @id @default(uuid())
+  userId    String
+  role      String
+  content   String
+  context   Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("ai_messages")
+}
+
+model Subscription {
+  id                   String    @id @default(uuid())
+  userId               String    @unique
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  plan                 UserPlan  @default(FREE)
+  status               String    @default("active")
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  canceledAt           DateTime?
+  trialEnd             DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  read      Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model SearchIndex {
+  id         String   @id @default(uuid())
+  userId     String
+  entityType String
+  entityId   String
+  title      String
+  content    String?
+  tags       String[] @default([])
+  metadata   Json?
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, entityType, entityId])
+  @@index([userId, entityType])
+  @@map("search_index")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model Organization {
+  id         String    @id @default(uuid())
+  name       String
+  slug       String    @unique
+  avatarUrl  String?
+  plan       UserPlan  @default(FREE)
+  maxMembers Int       @default(5)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  members        OrgMember[]
+  sharedProjects SharedProject[]
+  apiKeys        ApiKey[]
+
+  @@index([slug])
+  @@map("organizations")
+}
+
+model OrgMember {
+  id             String    @id @default(uuid())
+  organizationId String
+  userId         String
+  role           OrgRole   @default(MEMBER)
+  invitedAt      DateTime  @default(now())
+  joinedAt       DateTime?
+  invitedBy      String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("org_members")
+}
+
+model SharedProject {
+  id             String   @id @default(uuid())
+  organizationId String
+  projectId      String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, projectId])
+  @@map("shared_projects")
+}
+
+model ApiKey {
+  id             String    @id @default(uuid())
+  userId         String
+  organizationId String?
+  name           String
+  keyHash        String    @unique
+  keyPrefix      String
+  scopes         String[]  @default([])
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  requestCount   Int       @default(0)
+  createdAt      DateTime  @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  logs         ApiKeyLog[]
+
+  @@index([userId])
+  @@index([keyHash])
+  @@map("api_keys")
+}
+
+model ApiKeyLog {
+  id        String   @id @default(uuid())
+  apiKeyId  String
+  endpoint  String
+  method    String
+  status    Int
+  ipAddress String?
+  duration  Int?
+  createdAt DateTime @default(now())
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, createdAt])
+  @@map("api_key_logs")
+}
+
+model Invitation {
+  id             String    @id @default(uuid())
+  organizationId String
+  email          String
+  role           OrgRole   @default(MEMBER)
+  token          String    @unique @default(uuid())
+  invitedBy      String
+  acceptedAt     DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+
+  @@index([token])
+  @@index([organizationId, email])
+  @@map("invitations")
+}
