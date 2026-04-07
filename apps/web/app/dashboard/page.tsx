@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDashboardStats, useGoalsByPillar } from '@/hooks/useAnalytics'
 import { useFocusQueue, useCompleteTask } from '@/hooks/useTasks'
 import { useGoals } from '@/hooks/useGoals'
@@ -31,6 +31,13 @@ export default function DashboardPage() {
     staleTime: 1000 * 60 * 5,
   })
 
+  // Initialize journal text when today's entry loads
+  useEffect(() => {
+    if (todayJournal?.content && !journalText) {
+      setJournalText(todayJournal.content)
+    }
+  }, [todayJournal])
+
   const logWin = useMutation({
     mutationFn: () => winsApi.create({ title: winTitle }),
     onSuccess: () => {
@@ -43,11 +50,14 @@ export default function DashboardPage() {
   })
 
   const saveJournal = useMutation({
-    mutationFn: () => todayJournal?.id
-      ? journalApi.update(todayJournal.id, { content: journalText })
-      : journalApi.create({ content: journalText }),
+    mutationFn: () => {
+      const content = journalText.trim()
+      return todayJournal?.id
+        ? journalApi.update(todayJournal.id, { content })
+        : journalApi.create({ content })
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['journal'] })
+      qc.invalidateQueries({ queryKey: ['journal', 'today'] })
       showToast('Journal saved ✓')
     },
     onError: () => showToast('Failed to save journal', 'error'),
@@ -221,7 +231,7 @@ export default function DashboardPage() {
             {todayJournal && <span className="text-[9px] font-mono text-os-success">saved</span>}
           </CardHeader>
           <textarea
-            value={journalText || todayJournal?.content || ''}
+            value={journalText}
             onChange={e => setJournalText(e.target.value)}
             placeholder="How's your day going? Any thoughts, wins, or challenges..."
             rows={3}
@@ -229,9 +239,9 @@ export default function DashboardPage() {
           />
           <Button size="sm" variant="ghost" className="mt-2"
             loading={saveJournal.isPending}
-            disabled={!(journalText || todayJournal?.content)}
+            disabled={!journalText.trim()}
             onClick={() => saveJournal.mutate()}>
-            Save Reflection
+            {todayJournal ? 'Update Reflection' : 'Save Reflection'}
           </Button>
         </Card>
       </div>
