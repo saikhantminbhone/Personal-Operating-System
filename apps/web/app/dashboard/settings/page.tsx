@@ -47,11 +47,27 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex gap-6 animate-fade-in">
+    <div className="animate-fade-in space-y-4 sm:space-y-0 sm:flex sm:gap-6">
 
-      {/* Sidebar nav */}
-      <div className="w-48 flex-shrink-0">
-        <div className="space-y-1">
+      {/* Mobile: horizontal tab strip / Desktop: sidebar nav */}
+      <div className="sm:w-48 sm:flex-shrink-0">
+        {/* Mobile tabs */}
+        <div className="flex gap-1 overflow-x-auto pb-1 sm:hidden">
+          {SECTIONS.map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setActiveSection(id)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-mono whitespace-nowrap flex-shrink-0 transition-all touch-manipulation ${
+                activeSection === id
+                  ? 'bg-os-accent/10 text-os-accent border border-os-accent/20'
+                  : 'text-os-muted border border-os-border'
+              }`}>
+              <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Desktop vertical list */}
+        <div className="hidden sm:block space-y-1">
           {SECTIONS.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setActiveSection(id)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-mono transition-all ${
@@ -63,13 +79,13 @@ export default function SettingsPage() {
               {label}
             </button>
           ))}
-        </div>
 
-        {/* Version info */}
-        <div className="mt-8 px-3">
-          <p className="text-[9px] font-mono tracking-widest uppercase text-os-muted/50">Version</p>
-          <p className="text-[10px] font-mono text-os-muted mt-1">Saikhant OS v1.0.0</p>
-          <p className="text-[9px] font-mono text-os-muted/40 mt-0.5">Phase 0 — Foundation</p>
+          {/* Version info */}
+          <div className="mt-8 px-3">
+            <p className="text-[9px] font-mono tracking-widest uppercase text-os-muted/50">Version</p>
+            <p className="text-[10px] font-mono text-os-muted mt-1">Saikhant OS v1.0.0</p>
+            <p className="text-[9px] font-mono text-os-muted/40 mt-0.5">Phase 0 — Foundation</p>
+          </div>
         </div>
       </div>
 
@@ -107,7 +123,7 @@ export default function SettingsPage() {
 
             <Card>
               <CardHeader><CardTitle>📊 Your Stats</CardTitle></CardHeader>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-3 gap-3">
                 {[
                   { label: 'Day Streak',   value: stats?.streakCount ?? 0,          color: '#f97316' },
                   { label: 'Goals Active', value: stats?.activeGoalsCount ?? 0,     color: '#64ffda' },

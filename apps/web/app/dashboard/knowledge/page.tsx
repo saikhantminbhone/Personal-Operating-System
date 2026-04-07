@@ -8,8 +8,9 @@ import { Input, Select } from '@/components/ui/Input'
 import { RichEditor } from '@/components/modules/editor/RichEditor'
 import { useAppStore } from '@/store/useAppStore'
 import { timeAgo, formatDate } from '@/lib/utils'
-import { BookOpen, Plus, Search, FileText, Pin, Trash2, X, FolderPlus, Calendar, ArrowLeft } from 'lucide-react'
+import { BookOpen, Plus, Search, FileText, Pin, Trash2, X, FolderPlus, Calendar, ArrowLeft, Sparkles } from 'lucide-react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { useAiCategorizeNote } from '@/hooks/useAi'
 
 const NOTE_TYPES = [
   { value: 'NOTE',          label: '📝 Note' },
@@ -37,6 +38,26 @@ export default function KnowledgePage() {
   const [noteForm, setNoteForm] = useState({ title: '', type: 'NOTE', tags: '', collectionId: '' })
   const [colForm, setColForm] = useState({ name: '', color: '#64ffda', icon: '📁' })
   const { confirm, dialog: confirmDialog } = useConfirm()
+  const categorizeNote = useAiCategorizeNote()
+  const [noteSuggestion, setNoteSuggestion] = useState<{ collectionId: string | null; tags: string[] } | null>(null)
+
+  async function handleNoteTitleBlur() {
+    if (!noteForm.title.trim()) return
+    const result = await categorizeNote.mutateAsync({ title: noteForm.title, content: '' }).catch(() => null) as any
+    if (result && (result.collectionId || result.tags?.length)) {
+      setNoteSuggestion({ collectionId: result.collectionId, tags: result.tags || [] })
+    }
+  }
+
+  function applyNoteSuggestion() {
+    if (!noteSuggestion) return
+    setNoteForm(f => ({
+      ...f,
+      collectionId: noteSuggestion.collectionId || f.collectionId,
+      tags: noteSuggestion.tags.join(', ') || f.tags,
+    }))
+    setNoteSuggestion(null)
+  }
 
   const { data: notesData, isError: notesError } = useQuery<any>({
     queryKey: ['knowledge', 'notes', selectedCollection, search],
@@ -380,15 +401,23 @@ export default function KnowledgePage() {
       )}
 
       {/* Create Note Modal */}
-      <Modal open={createNoteOpen} onClose={() => setCreateNoteOpen(false)} title="New Note">
+      <Modal open={createNoteOpen} onClose={() => { setCreateNoteOpen(false); setNoteSuggestion(null) }} title="New Note">
         <div className="space-y-4">
           <Input
             label="Title *"
             placeholder="Note title..."
             value={noteForm.title}
-            onChange={e => setNoteForm(f => ({ ...f, title: e.target.value }))}
+            onChange={e => { setNoteForm(f => ({ ...f, title: e.target.value })); setNoteSuggestion(null) }}
+            onBlur={handleNoteTitleBlur}
           />
-          <div className="grid grid-cols-2 gap-3">
+          {noteSuggestion && (
+            <button onClick={applyNoteSuggestion}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-os-accent/20 bg-os-accent/5 text-[10px] font-mono text-os-accent hover:bg-os-accent/10 transition-all w-full text-left">
+              <Sparkles className="w-3 h-3 flex-shrink-0" />
+              <span>AI suggests{noteSuggestion.tags.length ? ` tags: ${noteSuggestion.tags.join(', ')}` : ''}{noteSuggestion.collectionId ? ' · collection match found' : ''} — tap to apply</span>
+            </button>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select label="Type" value={noteForm.type} onChange={e => setNoteForm(f => ({ ...f, type: e.target.value }))}>
               {NOTE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </Select>

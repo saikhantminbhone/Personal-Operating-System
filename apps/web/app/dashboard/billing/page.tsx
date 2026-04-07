@@ -90,7 +90,7 @@ function BillingContent() {
       {/* Plan cards */}
       <div>
         <p className="os-label mb-5">Choose Your Plan</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {(plans || [
             { id: 'FREE', name: 'Free', priceMonthly: 0, features: ['5 Goals', '50 Tasks', '3 Habits', '100 Notes', '10 AI messages/month'] },
             { id: 'PRO',  name: 'Pro',  priceMonthly: 12, features: ['Unlimited Everything', 'AI Assistant', 'Finance Tracker', 'Analytics', '14-day trial'], popular: true },

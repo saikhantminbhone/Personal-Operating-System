@@ -30,6 +30,13 @@ const NAV_TEAM = [
   { href: '/dashboard/api-keys',   icon: Key,             label: 'API Keys' },
 ]
 
+function closeMobileSidebar() {
+  const overlay = document.getElementById('mobile-sidebar-overlay')
+  const drawer = document.getElementById('mobile-sidebar-drawer')
+  if (overlay) overlay.style.display = 'none'
+  if (drawer) drawer.style.transform = 'translateX(-100%)'
+}
+
 export function Sidebar() {
   const pathname = usePathname()
   const { sidebarCollapsed, toggleSidebar, setModal } = useAppStore()
@@ -141,59 +148,39 @@ export function Sidebar() {
       <div id="mobile-sidebar-overlay"
         className="sm:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
         style={{ display: 'none' }}
-        onClick={() => {
-          const overlay = document.getElementById('mobile-sidebar-overlay')
-          const drawer = document.getElementById('mobile-sidebar-drawer')
-          if (overlay) overlay.style.display = 'none'
-          if (drawer) drawer.style.transform = 'translateX(-100%)'
-        }}>
+        onClick={closeMobileSidebar}>
       </div>
       <aside id="mobile-sidebar-drawer"
-        className="sm:hidden fixed left-0 top-0 h-screen w-72 bg-os-surface border-r border-os-border flex flex-col z-50 transition-transform duration-300"
+        className="sm:hidden fixed left-0 top-0 h-screen w-[min(280px,85vw)] bg-os-surface border-r border-os-border flex flex-col z-50 transition-transform duration-300"
         style={{ transform: 'translateX(-100%)' }}>
         <div className="flex items-center justify-between px-4 py-4 border-b border-os-border">
           <div className="flex items-center gap-2">
             <Hexagon className="w-5 h-5 text-os-accent" strokeWidth={1.5} />
             <span className="font-mono text-xs font-bold tracking-[0.3em] uppercase text-os-accent">SAIKHANT OS</span>
           </div>
-          <button onClick={() => {
-            const overlay = document.getElementById('mobile-sidebar-overlay')
-            const drawer = document.getElementById('mobile-sidebar-drawer')
-            if (overlay) overlay.style.display = 'none'
-            if (drawer) drawer.style.transform = 'translateX(-100%)'
-          }} className="text-os-muted hover:text-os-text p-2 touch-manipulation">
+          <button onClick={closeMobileSidebar} className="text-os-muted hover:text-os-text p-2 touch-manipulation">
             <X className="w-5 h-5" />
           </button>
         </div>
         <nav className="flex-1 py-3 overflow-y-auto">
           <div className="space-y-0.5">
-            {NAV_MAIN.map(item => <NavItem key={item.href} {...item} onClick={() => {
-              const overlay = document.getElementById('mobile-sidebar-overlay')
-              const drawer = document.getElementById('mobile-sidebar-drawer')
-              if (overlay) overlay.style.display = 'none'
-              if (drawer) drawer.style.transform = 'translateX(-100%)'
-            }} />)}
+            {NAV_MAIN.map(item => <NavItem key={item.href} {...item} onClick={closeMobileSidebar} />)}
           </div>
           <div className="px-4 pt-4 pb-1">
             <span className="text-[9px] font-mono tracking-[0.25em] uppercase text-os-muted/50">Team & API</span>
           </div>
           <div className="space-y-0.5 mt-1">
-            {NAV_TEAM.map(item => <NavItem key={item.href} {...item} onClick={() => {
-              const overlay = document.getElementById('mobile-sidebar-overlay')
-              const drawer = document.getElementById('mobile-sidebar-drawer')
-              if (overlay) overlay.style.display = 'none'
-              if (drawer) drawer.style.transform = 'translateX(-100%)'
-            }} />)}
+            {NAV_TEAM.map(item => <NavItem key={item.href} {...item} onClick={closeMobileSidebar} />)}
           </div>
         </nav>
         <div className="border-t border-os-border py-3 px-2 space-y-0.5">
-          <Link href="/dashboard/billing" className="flex items-center gap-3 py-3 px-2 rounded-lg text-os-muted hover:text-os-text min-h-[44px]">
+          <Link href="/dashboard/billing" onClick={closeMobileSidebar} className="flex items-center gap-3 py-3 px-2 rounded-lg text-os-muted hover:text-os-text min-h-[44px]">
             <CreditCard className="w-4 h-4" /><span className="text-xs font-mono">Billing</span>
           </Link>
-          <Link href="/dashboard/settings" className="flex items-center gap-3 py-3 px-2 rounded-lg text-os-muted hover:text-os-text min-h-[44px]">
+          <Link href="/dashboard/settings" onClick={closeMobileSidebar} className="flex items-center gap-3 py-3 px-2 rounded-lg text-os-muted hover:text-os-text min-h-[44px]">
             <Settings className="w-4 h-4" /><span className="text-xs font-mono">Settings</span>
           </Link>
-          <button onClick={() => signOut({ callbackUrl: '/auth/login' })}
+          <button onClick={() => { closeMobileSidebar(); signOut({ callbackUrl: '/auth/login' }) }}
             className="w-full flex items-center gap-3 py-3 px-2 rounded-lg text-os-muted hover:text-os-danger min-h-[44px] touch-manipulation">
             <LogOut className="w-4 h-4" /><span className="text-xs font-mono">Sign Out</span>
           </button>

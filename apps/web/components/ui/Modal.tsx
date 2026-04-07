@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, ReactNode } from 'react'
+import { useEffect, useRef, ReactNode } from 'react'
 import { X } from 'lucide-react'
 
 interface ModalProps {
@@ -13,6 +13,10 @@ interface ModalProps {
 const sizeMap = { sm: 400, md: 480, lg: 700 }
 
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  const startYRef = useRef(0)
+  const currentYRef = useRef(0)
+
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -23,6 +27,31 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
   }, [onClose])
+
+  function handleTouchStart(e: React.TouchEvent) {
+    startYRef.current = e.touches[0].clientY
+    currentYRef.current = 0
+    if (panelRef.current) panelRef.current.style.transition = 'none'
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    const delta = e.touches[0].clientY - startYRef.current
+    if (delta < 0) return // don't allow pulling up
+    currentYRef.current = delta
+    if (panelRef.current) panelRef.current.style.transform = `translateY(${delta}px)`
+  }
+
+  function handleTouchEnd() {
+    if (panelRef.current) {
+      panelRef.current.style.transition = ''
+      if (currentYRef.current > 100) {
+        panelRef.current.style.transform = `translateY(100%)`
+        setTimeout(onClose, 200)
+      } else {
+        panelRef.current.style.transform = ''
+      }
+    }
+  }
 
   if (!open) return null
 
@@ -36,16 +65,27 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
 
       {/* Panel */}
       <div
+        ref={panelRef}
         style={{ maxWidth: maxW }}
-        className="relative z-10 w-full max-h-[92vh] overflow-y-auto bg-[#0D1520] border border-[rgba(100,255,218,0.15)] rounded-t-2xl sm:rounded-xl sm:mb-8"
+        className="relative z-10 w-full max-h-[92vh] overflow-y-auto bg-[#0D1520] border border-[rgba(100,255,218,0.15)] rounded-t-2xl sm:rounded-xl sm:mb-8 transition-transform duration-200"
       >
-        {/* Mobile drag handle — hidden on sm+ screens */}
-        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+        {/* Mobile drag handle — swipe down to close */}
+        <div
+          className="flex justify-center pt-3 pb-1 sm:hidden cursor-grab active:cursor-grabbing"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           <div className="w-9 h-1 bg-[rgba(100,255,218,0.2)] rounded-full" />
         </div>
 
         {title && (
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-[rgba(100,255,218,0.1)]">
+          <div
+            className="flex items-center justify-between px-5 py-3.5 border-b border-[rgba(100,255,218,0.1)] sm:cursor-default cursor-grab active:cursor-grabbing"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#64FFDA]">{title}</span>
             <button
               onClick={onClose}

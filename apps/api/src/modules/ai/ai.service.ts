@@ -135,4 +135,128 @@ reflect on progress, manage their time, and think through decisions.`
       take: limit,
     })
   }
+
+  // ── Phase 2: Intelligence Layer ─────────────────────────────────────────────
+
+  async categorizeTransaction(userId: string, description: string, amount: number, txType: string) {
+    const categories = await this.prisma.financeCategory.findMany({ where: { userId }, select: { name: true } })
+    const categoryNames = categories.map(c => c.name).join(', ')
+
+    const prompt = `Categorize this ${txType.toLowerCase()} transaction for a personal finance tracker.
+Description: "${description}"
+Amount: ${(amount / 100).toFixed(2)}
+Existing categories: ${categoryNames || 'none yet'}
+
+Return JSON only:
+{ "category": "category name", "isNew": boolean, "icon": "single emoji", "confidence": 0.0 }
+
+Use an existing category if it fits. Keep names short (1-2 words). Confidence 0-1.
+Respond ONLY with valid JSON.`
+
+    try {
+      const response = await this.anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: prompt }],
+      })
+      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
+      return JSON.parse(text)
+    } catch {
+      return { category: 'Other', isNew: false, icon: '💸', confidence: 0.5 }
+    }
+  }
+
+  async categorizeNote(userId: string, title: string, content: string) {
+    const collections = await this.prisma.collection.findMany({
+      where: { userId }, select: { id: true, name: true },
+    })
+
+    const prompt = `Analyze this note and suggest how to organize it.
+Title: "${title}"
+Content (first 400 chars): "${(content || '').slice(0, 400)}"
+Available collections: ${collections.length ? collections.map(c => `"${c.name}" [id:${c.id}]`).join(', ') : 'none'}
+
+Return JSON only:
+{
+  "collectionId": "existing-id or null",
+  "tags": ["tag1", "tag2", "tag3"],
+  "summary": "one sentence"
+}
+
+Match to an existing collection if it fits. Tags should be 1-2 words, 2-3 max.
+Respond ONLY with valid JSON.`
+
+    try {
+      const response = await this.anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        messages: [{ role: 'user', content: prompt }],
+      })
+      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
+      return JSON.parse(text)
+    } catch {
+      return { collectionId: null, tags: [], summary: '' }
+    }
+  }
+
+  async suggestGoalForTask(userId: string, taskTitle: string) {
+    const goals = await this.prisma.goal.findMany({
+      where: { userId, deletedAt: null, status: 'ACTIVE' },
+      select: { id: true, title: true, pillar: true },
+    })
+
+    if (!goals.length) return { goalId: null, goalTitle: null, confidence: 0 }
+
+    const prompt = `Match this task to the most relevant active goal, if any.
+Task: "${taskTitle}"
+Goals: ${goals.map(g => `"${g.title}" (${g.pillar}) [id:${g.id}]`).join(' | ')}
+
+Return JSON only: { "goalId": "id or null", "goalTitle": "title or null", "confidence": 0.0 }
+Only suggest a goal if confidence > 0.65. Otherwise return null for both.
+Respond ONLY with valid JSON.`
+
+    try {
+      const response = await this.anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 80,
+        messages: [{ role: 'user', content: prompt }],
+      })
+      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
+      return JSON.parse(text)
+    } catch {
+      return { goalId: null, goalTitle: null, confidence: 0 }
+    }
+  }
+
+  async semanticSearch(userId: string, query: string, results: any[]) {
+    if (!results.length) return { results: [], intent: null, topInsight: null }
+
+    const prompt = `User searched for: "${query}"
+Search results:
+${results.map((r, i) => `[${i}] ${r.entityType}: "${r.title}" — ${r.subtitle || ''}`).join('\n')}
+
+Re-rank by semantic relevance. What is the user trying to find?
+
+Return JSON only:
+{
+  "rankedIndexes": [0, 1, 2, ...],
+  "intent": "brief description of what user wants",
+  "topInsight": "one helpful observation about the top result (or null)"
+}
+Respond ONLY with valid JSON.`
+
+    try {
+      const response = await this.anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }],
+      })
+      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
+      const { rankedIndexes, intent, topInsight } = JSON.parse(text)
+      const ranked = (rankedIndexes as number[] || []).map(i => results[i]).filter(Boolean)
+      return { results: ranked.length ? ranked : results, intent, topInsight }
+    } catch {
+      return { results, intent: null, topInsight: null }
+    }
+  }
 }

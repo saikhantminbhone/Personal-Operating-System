@@ -7,6 +7,8 @@ import { Topbar } from '@/components/layout/Topbar'
 import { CheckinModal } from '@/components/layout/CheckinModal'
 import { CommandPalette } from '@/components/layout/CommandPalette'
 import { Toast } from '@/components/ui/Toast'
+import { PWAInstallPrompt } from '@/components/ui/PWAInstallPrompt'
+import { OfflineIndicator } from '@/components/ui/OfflineIndicator'
 import { LogIn } from 'lucide-react'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -64,6 +66,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <CheckinModal />
       <CommandPalette />
       <Toast />
+      <OfflineIndicator />
+      <PWAInstallPrompt />
 
       {/* Session expired overlay */}
       {sessionExpired && (

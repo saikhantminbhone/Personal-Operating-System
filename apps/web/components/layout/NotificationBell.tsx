@@ -98,7 +98,7 @@ export function NotificationBell() {
                   <p className="text-[10px] font-mono text-os-muted mt-0.5 leading-relaxed">{n.body}</p>
                   <p className="text-[9px] font-mono text-os-muted/60 mt-1">{timeAgo(n.createdAt)}</p>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   {!n.read && (
                     <button onClick={() => markRead.mutate(n.id)}
                       className="p-1 text-os-muted hover:text-os-success touch-manipulation">

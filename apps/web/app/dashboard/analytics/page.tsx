@@ -18,7 +18,7 @@ export default function AnalyticsPage() {
     <div className="space-y-6 animate-fade-in">
 
       {/* Top stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: 'Day Streak', value: `${stats?.streakCount ?? 0}d`, color: '#f97316' },
           { label: 'Goals Active', value: stats?.activeGoalsCount ?? 0, color: '#64ffda' },
@@ -61,7 +61,7 @@ export default function AnalyticsPage() {
         )}
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
         {/* Goals by pillar */}
         <Card>
@@ -131,10 +131,10 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Energy + habits today */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card>
           <CardHeader><CardTitle>⚡ Today's Energy</CardTitle></CardHeader>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {ENERGY_META.map((e, i) => (
               <div key={i} className={`text-center p-3 rounded-lg border transition-all ${
                 stats?.energyLevel === i ? 'border-current bg-current/10' : 'border-os-border opacity-40'

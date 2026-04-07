@@ -8,7 +8,8 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, Select } from '@/components/ui/Input'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { useAppStore } from '@/store/useAppStore'
-import { PiggyBank, Plus, Trash2, ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet } from 'lucide-react'
+import { PiggyBank, Plus, Trash2, ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet, Sparkles } from 'lucide-react'
+import { useAiCategorizeTx } from '@/hooks/useAi'
 import { AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 const ACCOUNT_ICONS: Record<string, string> = { CASH: '💵', BANK: '🏦', SAVINGS: '🏧', INVESTMENT: '📈', CRYPTO: '₿', CREDIT: '💳' }
@@ -30,6 +31,15 @@ export default function FinancePage() {
   const [txModal, setTxModal] = useState(false)
   const [accountForm, setAccountForm] = useState({ name: '', type: 'BANK', currencyCode: 'USD', initialBalanceCents: '' })
   const [txForm, setTxForm] = useState({ accountId: '', amountCents: '', type: 'EXPENSE', description: '', transactionDate: new Date().toISOString().slice(0,10) })
+  const [categorySuggestion, setCategorySuggestion] = useState<{ category: string; icon: string } | null>(null)
+  const categorizeTx = useAiCategorizeTx()
+
+  async function handleDescriptionBlur() {
+    if (!txForm.description.trim() || txForm.type === 'TRANSFER') return
+    const amount = parseFloat(txForm.amountCents || '0') * 100
+    const result = await categorizeTx.mutateAsync({ description: txForm.description, amount, type: txForm.type }).catch(() => null) as any
+    if (result?.category) setCategorySuggestion({ category: result.category, icon: result.icon || '💸' })
+  }
 
   const { data: accounts } = useQuery<any[]>({ queryKey: ['finance','accounts'], queryFn: () => api.get('/finance/accounts') })
   const { data: txData } = useQuery<any>({ queryKey: ['finance','transactions'], queryFn: () => api.get('/finance/transactions', { params: { limit: 30 } }) })
@@ -83,8 +93,8 @@ export default function FinancePage() {
       </div>
 
       {/* Top stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="col-span-2 md:col-span-1">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="col-span-2 sm:col-span-1">
           <div className="text-[10px] font-mono tracking-widest uppercase text-os-muted mb-2 flex items-center gap-2">
             <Wallet className="w-3 h-3" /> Net Worth
           </div>
@@ -123,7 +133,7 @@ export default function FinancePage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
         {/* Net worth trend */}
         <Card className="lg:col-span-2">
@@ -171,7 +181,7 @@ export default function FinancePage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
         {/* Accounts */}
         <div>
@@ -213,7 +223,7 @@ export default function FinancePage() {
           <div className="space-y-1.5">
             {transactions.map((tx: any) => (
               <div key={tx.id}
-                className="flex items-center gap-3 p-3 bg-white/[0.02] border border-os-border rounded-lg group hover:border-os-accent/15 transition-all">
+                className="flex items-center gap-3 p-3 bg-white/[0.02] border border-os-border rounded-lg group hover:border-os-accent/15 transition-all touch-manipulation">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs flex-shrink-0 ${tx.type === 'INCOME' ? 'bg-os-success/10 text-os-success' : 'bg-os-danger/10 text-os-danger'}`}>
                   {tx.type === 'INCOME' ? '↑' : '↓'}
                 </div>
@@ -227,7 +237,7 @@ export default function FinancePage() {
                   {tx.type === 'INCOME' ? '+' : '-'}{fmt(Math.abs(tx.amountCents), tx.currencyCode)}
                 </div>
                 <button onClick={() => deleteTx.mutate(tx.id)}
-                  className="opacity-0 group-hover:opacity-100 text-os-muted hover:text-os-danger transition-all p-1">
+                  className="text-os-muted hover:text-os-danger transition-all p-1 sm:opacity-0 sm:group-hover:opacity-100">
                   <Trash2 className="w-3 h-3" />
                 </button>
               </div>
@@ -276,7 +286,18 @@ export default function FinancePage() {
             <option value="TRANSFER">Transfer</option>
           </Select>
           <Input label="Amount" type="number" placeholder="50.00" value={txForm.amountCents} onChange={e => setTxForm(f => ({ ...f, amountCents: e.target.value }))} />
-          <Input label="Description" placeholder="Grab delivery, Salary..." value={txForm.description} onChange={e => setTxForm(f => ({ ...f, description: e.target.value }))} />
+          <Input label="Description" placeholder="Grab delivery, Salary..." value={txForm.description}
+            onChange={e => { setTxForm(f => ({ ...f, description: e.target.value })); setCategorySuggestion(null) }}
+            onBlur={handleDescriptionBlur} />
+          {categorySuggestion && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-os-accent/20 bg-os-accent/5">
+              <Sparkles className="w-3 h-3 text-os-accent flex-shrink-0" />
+              <span className="text-[10px] font-mono text-os-accent flex-1">
+                AI category: {categorySuggestion.icon} <strong>{categorySuggestion.category}</strong>
+              </span>
+              <button onClick={() => setCategorySuggestion(null)} className="text-os-muted hover:text-os-text text-[10px] font-mono">dismiss</button>
+            </div>
+          )}
           <Input label="Date" type="date" value={txForm.transactionDate} onChange={e => setTxForm(f => ({ ...f, transactionDate: e.target.value }))} />
           <div className="flex gap-3 pt-2">
             <Button className="flex-1" loading={createTx.isPending} onClick={() => {

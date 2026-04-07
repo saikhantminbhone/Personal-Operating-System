@@ -113,6 +113,15 @@ export const aiApi = {
   chat: (message: string, conversationHistory?: any[]) =>
     api.post('/ai/chat', { message, conversationHistory }),
   chatHistory: () => api.get('/ai/chat/history'),
+  // Phase 2 intelligence
+  categorizeTransaction: (description: string, amount: number, type: string) =>
+    api.post('/ai/categorize/transaction', { description, amount, type }),
+  categorizeNote: (title: string, content?: string) =>
+    api.post('/ai/categorize/note', { title, content }),
+  suggestGoal: (taskTitle: string) =>
+    api.post('/ai/suggest/goal', { taskTitle }),
+  semanticSearch: (query: string, results: any[]) =>
+    api.post('/ai/search/semantic', { query, results }),
 }
 
 // ── HABITS ────────────────────────────────────────────────────────────────────

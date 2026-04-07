@@ -12,6 +12,8 @@ import { ENERGY_META, PRIORITY_META, formatDate } from '@/lib/utils'
 import { TaskStatus, TaskPriority } from '@/types'
 import { Plus, Trash2, CheckCircle, Circle, Filter } from 'lucide-react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { useAiSuggestGoal } from '@/hooks/useAi'
+import { Sparkles } from 'lucide-react'
 
 export default function TasksPage() {
   const [filter, setFilter] = useState<string>('active')
@@ -26,6 +28,16 @@ export default function TasksPage() {
   const deleteTask = useDeleteTask()
   const { showToast } = useAppStore()
   const { confirm, dialog: confirmDialog } = useConfirm()
+  const suggestGoal = useAiSuggestGoal()
+  const [goalSuggestion, setGoalSuggestion] = useState<{ goalId: string; goalTitle: string } | null>(null)
+
+  async function handleTitleBlur() {
+    if (!form.title.trim() || form.goalId) return
+    const result = await suggestGoal.mutateAsync(form.title).catch(() => null) as any
+    if (result?.goalId && result?.confidence > 0.65) {
+      setGoalSuggestion({ goalId: result.goalId, goalTitle: result.goalTitle })
+    }
+  }
 
   const tasks = taskData?.data || []
   const pending = tasks.filter(t => t.status === 'TODO' || t.status === 'IN_PROGRESS')
@@ -128,7 +140,7 @@ export default function TasksPage() {
                 {ENERGY_META[task.energyRequired]?.icon}
               </span>
               <button onClick={() => handleDelete(task.id)}
-                className="text-os-muted hover:text-os-danger transition-colors opacity-0 group-hover:opacity-100">
+                className="text-os-muted hover:text-os-danger transition-colors sm:opacity-0 sm:group-hover:opacity-100">
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
@@ -145,13 +157,23 @@ export default function TasksPage() {
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="New Task">
         <div className="space-y-4">
           <Input label="Task" placeholder="What needs to be done?" value={form.title}
-            onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+            onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setGoalSuggestion(null) }}
+            onBlur={handleTitleBlur} />
+          {goalSuggestion && !form.goalId && (
+            <button
+              onClick={() => { setForm(f => ({ ...f, goalId: goalSuggestion.goalId })); setGoalSuggestion(null) }}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-os-accent/20 bg-os-accent/5 text-[10px] font-mono text-os-accent hover:bg-os-accent/10 transition-all w-full text-left"
+            >
+              <Sparkles className="w-3 h-3 flex-shrink-0" />
+              <span>AI suggests linking to <strong>{goalSuggestion.goalTitle}</strong> — tap to apply</span>
+            </button>
+          )}
           <Select label="Link to Goal (optional)" value={form.goalId}
-            onChange={e => setForm(f => ({ ...f, goalId: e.target.value }))}>
+            onChange={e => { setForm(f => ({ ...f, goalId: e.target.value })); setGoalSuggestion(null) }}>
             <option value="">— No linked goal —</option>
             {goals?.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
           </Select>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select label="Priority" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
               {Object.keys(PRIORITY_META).map(p => <option key={p} value={p}>{p}</option>)}
             </Select>
@@ -160,7 +182,7 @@ export default function TasksPage() {
               {ENERGY_META.map((e, i) => <option key={i} value={i}>{e.icon} {e.label}</option>)}
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Est. Minutes" type="number" placeholder="30" value={form.estimatedMinutes}
               onChange={e => setForm(f => ({ ...f, estimatedMinutes: e.target.value }))} />
             <Input label="Due Date" type="date" value={form.dueDate}
