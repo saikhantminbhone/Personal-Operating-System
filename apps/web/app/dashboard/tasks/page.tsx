@@ -12,7 +12,7 @@ import { ENERGY_META, PRIORITY_META, formatDate } from '@/lib/utils'
 import { TaskStatus, TaskPriority } from '@/types'
 import { Plus, Trash2, CheckCircle, Circle, Filter } from 'lucide-react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
-import { useAiSuggestGoal } from '@/hooks/useAi'
+import { useAiSuggestGoal, useAiRecordFeedback } from '@/hooks/useAi'
 import { Sparkles } from 'lucide-react'
 
 export default function TasksPage() {
@@ -29,6 +29,7 @@ export default function TasksPage() {
   const { showToast } = useAppStore()
   const { confirm, dialog: confirmDialog } = useConfirm()
   const suggestGoal = useAiSuggestGoal()
+  const recordFeedback = useAiRecordFeedback()
   const [goalSuggestion, setGoalSuggestion] = useState<{ goalId: string; goalTitle: string } | null>(null)
 
   async function handleTitleBlur() {
@@ -37,6 +38,13 @@ export default function TasksPage() {
     if (result?.goalId && result?.confidence > 0.65) {
       setGoalSuggestion({ goalId: result.goalId, goalTitle: result.goalTitle })
     }
+  }
+
+  function handleGoalFeedback(accepted: boolean) {
+    if (!goalSuggestion) return
+    recordFeedback.mutate({ feature: 'goal_suggestion', input: form.title, suggestion: goalSuggestion.goalTitle, accepted })
+    if (accepted) setForm(f => ({ ...f, goalId: goalSuggestion.goalId }))
+    setGoalSuggestion(null)
   }
 
   const tasks = taskData?.data || []
@@ -160,13 +168,12 @@ export default function TasksPage() {
             onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setGoalSuggestion(null) }}
             onBlur={handleTitleBlur} />
           {goalSuggestion && !form.goalId && (
-            <button
-              onClick={() => { setForm(f => ({ ...f, goalId: goalSuggestion.goalId })); setGoalSuggestion(null) }}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-os-accent/20 bg-os-accent/5 text-[10px] font-mono text-os-accent hover:bg-os-accent/10 transition-all w-full text-left"
-            >
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-os-accent/20 bg-os-accent/5 text-[10px] font-mono text-os-accent">
               <Sparkles className="w-3 h-3 flex-shrink-0" />
-              <span>AI suggests linking to <strong>{goalSuggestion.goalTitle}</strong> — tap to apply</span>
-            </button>
+              <span className="flex-1">AI suggests: <strong>{goalSuggestion.goalTitle}</strong></span>
+              <button onClick={() => handleGoalFeedback(true)} className="hover:text-os-text transition-colors">apply</button>
+              <button onClick={() => handleGoalFeedback(false)} className="text-os-muted hover:text-os-text transition-colors">dismiss</button>
+            </div>
           )}
           <Select label="Link to Goal (optional)" value={form.goalId}
             onChange={e => { setForm(f => ({ ...f, goalId: e.target.value })); setGoalSuggestion(null) }}>

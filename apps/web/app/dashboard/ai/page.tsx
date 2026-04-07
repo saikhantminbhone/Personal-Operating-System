@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 export default function AiPage() {
   const [input, setInput] = useState('')
   const [briefingOpen, setBriefingOpen] = useState(false)
-  const { mutateAsync: sendMessage, isPending, history, clearHistory } = useAiChat()
+  const { sendMessage, isStreaming, streamingText, history, clearHistory } = useAiChat()
   const { data: briefing, refetch: refetchBriefing, isFetching } = useAiBriefing()
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -17,10 +17,10 @@ export default function AiPage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length])
+  }, [messages.length, streamingText])
 
   async function handleSend() {
-    if (!input.trim() || isPending) return
+    if (!input.trim() || isStreaming) return
     const msg = input.trim()
     setInput('')
     await sendMessage(msg)
@@ -114,12 +114,12 @@ export default function AiPage() {
         </Card>
       </div>
 
-      {/* ── Chat (full width on mobile, flex-1 on desktop) ── */}
+      {/* ── Chat ── */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <Card className="flex-1 flex flex-col overflow-hidden p-0 min-h-0">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-            {messages.length === 0 ? (
+            {messages.length === 0 && !isStreaming ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <Sparkles className="w-8 h-8 text-os-accent/40 mb-3" />
                 <p className="text-sm font-mono text-os-muted">Your AI chief of staff is ready.</p>
@@ -134,41 +134,52 @@ export default function AiPage() {
                   ))}
                 </div>
               </div>
-            ) : messages.map((msg, i) => (
-              <div key={i} className={cn('flex gap-2 sm:gap-3', msg.role === 'user' && 'flex-row-reverse')}>
-                <div className={cn(
-                  'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0',
-                  msg.role === 'user' ? 'bg-os-accent/20' : 'bg-os-surface border border-os-border'
-                )}>
-                  {msg.role === 'user'
-                    ? <User className="w-3.5 h-3.5 text-os-accent" />
-                    : <Bot className="w-3.5 h-3.5 text-os-text" />
-                  }
-                </div>
-                <div className={cn(
-                  'max-w-[80%] sm:max-w-[75%] p-3 rounded-xl text-sm font-mono leading-relaxed',
-                  msg.role === 'user'
-                    ? 'bg-os-accent/10 text-os-text border border-os-accent/15 rounded-tr-sm'
-                    : 'bg-white/[0.03] text-os-text border border-os-border rounded-tl-sm'
-                )}>
-                  {msg.content}
-                </div>
-              </div>
-            ))}
-            {isPending && (
-              <div className="flex gap-2 sm:gap-3">
-                <div className="w-7 h-7 rounded-full bg-os-surface border border-os-border flex items-center justify-center">
-                  <Bot className="w-3.5 h-3.5 text-os-text" />
-                </div>
-                <div className="p-3 bg-white/[0.03] border border-os-border rounded-xl rounded-tl-sm">
-                  <div className="flex gap-1">
-                    {[0,1,2].map(i => (
-                      <div key={i} className="w-1.5 h-1.5 rounded-full bg-os-accent/60 animate-bounce"
-                        style={{ animationDelay: `${i * 0.15}s` }} />
-                    ))}
+            ) : (
+              <>
+                {messages.map((msg, i) => (
+                  <div key={i} className={cn('flex gap-2 sm:gap-3', msg.role === 'user' && 'flex-row-reverse')}>
+                    <div className={cn(
+                      'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0',
+                      msg.role === 'user' ? 'bg-os-accent/20' : 'bg-os-surface border border-os-border'
+                    )}>
+                      {msg.role === 'user'
+                        ? <User className="w-3.5 h-3.5 text-os-accent" />
+                        : <Bot className="w-3.5 h-3.5 text-os-text" />
+                      }
+                    </div>
+                    <div className={cn(
+                      'max-w-[80%] sm:max-w-[75%] p-3 rounded-xl text-sm font-mono leading-relaxed whitespace-pre-wrap',
+                      msg.role === 'user'
+                        ? 'bg-os-accent/10 text-os-text border border-os-accent/15 rounded-tr-sm'
+                        : 'bg-white/[0.03] text-os-text border border-os-border rounded-tl-sm'
+                    )}>
+                      {msg.content}
+                    </div>
                   </div>
-                </div>
-              </div>
+                ))}
+
+                {/* Streaming response */}
+                {isStreaming && (
+                  <div className="flex gap-2 sm:gap-3">
+                    <div className="w-7 h-7 rounded-full bg-os-surface border border-os-border flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-3.5 h-3.5 text-os-text" />
+                    </div>
+                    <div className="max-w-[80%] sm:max-w-[75%] p-3 bg-white/[0.03] border border-os-border rounded-xl rounded-tl-sm text-sm font-mono leading-relaxed text-os-text whitespace-pre-wrap">
+                      {streamingText || (
+                        <div className="flex gap-1 items-center py-0.5">
+                          {[0, 1, 2].map(i => (
+                            <div key={i} className="w-1.5 h-1.5 rounded-full bg-os-accent/60 animate-bounce"
+                              style={{ animationDelay: `${i * 0.15}s` }} />
+                          ))}
+                        </div>
+                      )}
+                      {streamingText && (
+                        <span className="inline-block w-0.5 h-3.5 bg-os-accent/70 ml-0.5 animate-pulse align-text-bottom" />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             <div ref={bottomRef} />
           </div>
@@ -182,12 +193,12 @@ export default function AiPage() {
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
                 placeholder="Ask your AI chief of staff..."
                 className="flex-1 os-input text-sm"
-                disabled={isPending}
+                disabled={isStreaming}
               />
-              <Button onClick={handleSend} loading={isPending} disabled={!input.trim()}>
+              <Button onClick={handleSend} loading={isStreaming} disabled={!input.trim()}>
                 <Send className="w-3 h-3" />
               </Button>
-              {messages.length > 0 && (
+              {messages.length > 0 && !isStreaming && (
                 <Button variant="ghost" onClick={clearHistory} title="Clear chat">
                   <RefreshCw className="w-3 h-3" />
                 </Button>

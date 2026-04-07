@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { aiApi } from '@/lib/api'
-import { useState, useCallback, useRef } from 'react'
+import { aiApi, getAuthToken } from '@/lib/api'
+import { useState, useCallback } from 'react'
 
 export function useAiBriefing() {
   return useQuery({
@@ -12,11 +12,92 @@ export function useAiBriefing() {
 
 export function useAiChat() {
   const [history, setHistory] = useState<any[]>([])
-  const mutation = useMutation({
-    mutationFn: (message: string) => aiApi.chat(message, history),
-    onSuccess: (data: any) => setHistory(data.conversationHistory || []),
-  })
-  return { ...mutation, history, clearHistory: () => setHistory([]) }
+  const [streamingText, setStreamingText] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+
+  const sendMessage = useCallback(async (message: string) => {
+    setIsStreaming(true)
+    setStreamingText('')
+
+    // Optimistically add user message to history
+    const newHistory = [...history, { role: 'user', content: message }]
+    setHistory(newHistory)
+
+    try {
+      const token = getAuthToken()
+      // Fallback to NextAuth session if no in-memory token
+      let authHeader = token ? `Bearer ${token}` : ''
+      if (!authHeader) {
+        try {
+          const { getSession } = await import('next-auth/react')
+          const session = await getSession()
+          if ((session as any)?.accessToken) {
+            authHeader = `Bearer ${(session as any).accessToken}`
+          }
+        } catch {}
+      }
+
+      const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'
+      const res = await fetch(`${BASE_URL}/ai/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authHeader ? { Authorization: authHeader } : {}),
+        },
+        body: JSON.stringify({ message, conversationHistory: history }),
+      })
+
+      if (!res.ok || !res.body) {
+        throw new Error('Stream request failed')
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const data = JSON.parse(line.slice(6))
+            if (data.token) {
+              accumulated += data.token
+              setStreamingText(accumulated)
+            } else if (data.done) {
+              const finalText = data.fullText || accumulated
+              setStreamingText('')
+              setHistory([...newHistory, { role: 'assistant', content: finalText }])
+            }
+          } catch {}
+        }
+      }
+    } catch (err) {
+      // Fallback to non-streaming on error
+      try {
+        const result: any = await aiApi.chat(message, history)
+        const assistantMsg = result.conversationHistory?.slice(-1)[0]
+        setHistory(result.conversationHistory || newHistory)
+        setStreamingText('')
+      } catch {}
+    } finally {
+      setIsStreaming(false)
+      setStreamingText('')
+    }
+  }, [history])
+
+  return {
+    sendMessage,
+    history,
+    streamingText,
+    isStreaming,
+    clearHistory: () => { setHistory([]); setStreamingText('') },
+  }
 }
 
 // ── Phase 2: Intelligence hooks ──────────────────────────────────────────────
@@ -45,5 +126,16 @@ export function useAiSemanticSearch() {
   return useMutation({
     mutationFn: ({ query, results }: { query: string; results: any[] }) =>
       aiApi.semanticSearch(query, results),
+  })
+}
+
+export function useAiRecordFeedback() {
+  return useMutation({
+    mutationFn: ({ feature, input, suggestion, accepted }: {
+      feature: string
+      input: string
+      suggestion: string
+      accepted: boolean
+    }) => aiApi.recordFeedback(feature, input, suggestion, accepted),
   })
 }

@@ -9,7 +9,7 @@ import { Input, Select } from '@/components/ui/Input'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { useAppStore } from '@/store/useAppStore'
 import { PiggyBank, Plus, Trash2, ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet, Sparkles } from 'lucide-react'
-import { useAiCategorizeTx } from '@/hooks/useAi'
+import { useAiCategorizeTx, useAiRecordFeedback } from '@/hooks/useAi'
 import { AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 const ACCOUNT_ICONS: Record<string, string> = { CASH: '💵', BANK: '🏦', SAVINGS: '🏧', INVESTMENT: '📈', CRYPTO: '₿', CREDIT: '💳' }
@@ -33,12 +33,19 @@ export default function FinancePage() {
   const [txForm, setTxForm] = useState({ accountId: '', amountCents: '', type: 'EXPENSE', description: '', transactionDate: new Date().toISOString().slice(0,10) })
   const [categorySuggestion, setCategorySuggestion] = useState<{ category: string; icon: string } | null>(null)
   const categorizeTx = useAiCategorizeTx()
+  const recordFeedback = useAiRecordFeedback()
 
   async function handleDescriptionBlur() {
     if (!txForm.description.trim() || txForm.type === 'TRANSFER') return
     const amount = parseFloat(txForm.amountCents || '0') * 100
     const result = await categorizeTx.mutateAsync({ description: txForm.description, amount, type: txForm.type }).catch(() => null) as any
     if (result?.category) setCategorySuggestion({ category: result.category, icon: result.icon || '💸' })
+  }
+
+  function handleCategoryFeedback(accepted: boolean) {
+    if (!categorySuggestion) return
+    recordFeedback.mutate({ feature: 'tx_categorization', input: txForm.description, suggestion: categorySuggestion.category, accepted })
+    setCategorySuggestion(null)
   }
 
   const { data: accounts } = useQuery<any[]>({ queryKey: ['finance','accounts'], queryFn: () => api.get('/finance/accounts') })
@@ -295,7 +302,8 @@ export default function FinancePage() {
               <span className="text-[10px] font-mono text-os-accent flex-1">
                 AI category: {categorySuggestion.icon} <strong>{categorySuggestion.category}</strong>
               </span>
-              <button onClick={() => setCategorySuggestion(null)} className="text-os-muted hover:text-os-text text-[10px] font-mono">dismiss</button>
+              <button onClick={() => handleCategoryFeedback(true)} className="text-os-accent hover:text-os-text text-[10px] font-mono">apply</button>
+              <button onClick={() => handleCategoryFeedback(false)} className="text-os-muted hover:text-os-text text-[10px] font-mono">dismiss</button>
             </div>
           )}
           <Input label="Date" type="date" value={txForm.transactionDate} onChange={e => setTxForm(f => ({ ...f, transactionDate: e.target.value }))} />

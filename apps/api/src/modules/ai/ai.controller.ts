@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Body, UseGuards, Query } from '@nestjs/common'
+import { Controller, Get, Post, Body, UseGuards, Res } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
-import { IsString, IsArray, IsOptional, IsNumber, IsIn } from 'class-validator'
+import { IsString, IsArray, IsOptional, IsNumber, IsBoolean } from 'class-validator'
+import { Response } from 'express'
 import { AiService } from './ai.service'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
@@ -30,6 +31,13 @@ class SemanticSearchDto {
   @IsArray() results: any[]
 }
 
+class FeedbackDto {
+  @IsString() feature: string
+  @IsString() input: string
+  @IsString() suggestion: string
+  @IsBoolean() accepted: boolean
+}
+
 @ApiTags('AI')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -44,9 +52,15 @@ export class AiController {
   }
 
   @Post('chat')
-  @ApiOperation({ summary: 'Chat with AI assistant' })
+  @ApiOperation({ summary: 'Chat with AI assistant (non-streaming)' })
   chat(@CurrentUser() user: any, @Body() dto: ChatDto) {
     return this.ai.chat(user.id, dto.message, dto.conversationHistory)
+  }
+
+  @Post('chat/stream')
+  @ApiOperation({ summary: 'Chat with AI assistant (SSE streaming)' })
+  async chatStream(@CurrentUser() user: any, @Body() dto: ChatDto, @Res() res: Response) {
+    return this.ai.chatStream(user.id, dto.message, dto.conversationHistory, res)
   }
 
   @Get('chat/history')
@@ -79,5 +93,11 @@ export class AiController {
   @ApiOperation({ summary: 'AI re-rank and enrich search results' })
   semanticSearch(@CurrentUser() user: any, @Body() dto: SemanticSearchDto) {
     return this.ai.semanticSearch(user.id, dto.query, dto.results)
+  }
+
+  @Post('feedback')
+  @ApiOperation({ summary: 'Record user acceptance/rejection of AI suggestion' })
+  recordFeedback(@CurrentUser() user: any, @Body() dto: FeedbackDto) {
+    return this.ai.recordFeedback(user.id, dto.feature, dto.input, dto.suggestion, dto.accepted)
   }
 }

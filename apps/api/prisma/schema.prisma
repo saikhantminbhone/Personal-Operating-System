@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../../../node_modules/.prisma/client"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -133,6 +133,7 @@ model User {
   journalEntries JournalEntry[]
   wins           Win[]
   aiMessages     AiMessage[]
+  aiFeedback     AiFeedback[]
   subscription   Subscription?
   notifications  Notification[]
   apiKeys        ApiKey[]
@@ -440,6 +441,21 @@ model AiMessage {
 
   @@index([userId, createdAt])
   @@map("ai_messages")
+}
+
+model AiFeedback {
+  id         String   @id @default(uuid())
+  userId     String
+  feature    String   // e.g. "goal_suggestion", "note_categorization", "tx_categorization"
+  input      String   // what was submitted (task title, note title, tx description)
+  suggestion String   // what AI suggested
+  accepted   Boolean  // did user accept or dismiss
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, feature])
+  @@map("ai_feedback")
 }
 
 model Subscription {

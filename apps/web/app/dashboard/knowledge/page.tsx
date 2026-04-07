@@ -10,7 +10,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { timeAgo, formatDate } from '@/lib/utils'
 import { BookOpen, Plus, Search, FileText, Pin, Trash2, X, FolderPlus, Calendar, ArrowLeft, Sparkles } from 'lucide-react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
-import { useAiCategorizeNote } from '@/hooks/useAi'
+import { useAiCategorizeNote, useAiRecordFeedback } from '@/hooks/useAi'
 
 const NOTE_TYPES = [
   { value: 'NOTE',          label: '📝 Note' },
@@ -39,6 +39,7 @@ export default function KnowledgePage() {
   const [colForm, setColForm] = useState({ name: '', color: '#64ffda', icon: '📁' })
   const { confirm, dialog: confirmDialog } = useConfirm()
   const categorizeNote = useAiCategorizeNote()
+  const recordFeedback = useAiRecordFeedback()
   const [noteSuggestion, setNoteSuggestion] = useState<{ collectionId: string | null; tags: string[] } | null>(null)
 
   async function handleNoteTitleBlur() {
@@ -49,13 +50,17 @@ export default function KnowledgePage() {
     }
   }
 
-  function applyNoteSuggestion() {
+  function handleNoteFeedback(accepted: boolean) {
     if (!noteSuggestion) return
-    setNoteForm(f => ({
-      ...f,
-      collectionId: noteSuggestion.collectionId || f.collectionId,
-      tags: noteSuggestion.tags.join(', ') || f.tags,
-    }))
+    const suggestion = noteSuggestion.tags.join(', ') || noteSuggestion.collectionId || ''
+    recordFeedback.mutate({ feature: 'note_categorization', input: noteForm.title, suggestion, accepted })
+    if (accepted) {
+      setNoteForm(f => ({
+        ...f,
+        collectionId: noteSuggestion.collectionId || f.collectionId,
+        tags: noteSuggestion.tags.join(', ') || f.tags,
+      }))
+    }
     setNoteSuggestion(null)
   }
 
@@ -411,11 +416,12 @@ export default function KnowledgePage() {
             onBlur={handleNoteTitleBlur}
           />
           {noteSuggestion && (
-            <button onClick={applyNoteSuggestion}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-os-accent/20 bg-os-accent/5 text-[10px] font-mono text-os-accent hover:bg-os-accent/10 transition-all w-full text-left">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-os-accent/20 bg-os-accent/5 text-[10px] font-mono text-os-accent">
               <Sparkles className="w-3 h-3 flex-shrink-0" />
-              <span>AI suggests{noteSuggestion.tags.length ? ` tags: ${noteSuggestion.tags.join(', ')}` : ''}{noteSuggestion.collectionId ? ' · collection match found' : ''} — tap to apply</span>
-            </button>
+              <span className="flex-1">AI suggests{noteSuggestion.tags.length ? ` tags: ${noteSuggestion.tags.join(', ')}` : ''}{noteSuggestion.collectionId ? ' · collection match' : ''}</span>
+              <button onClick={() => handleNoteFeedback(true)} className="hover:text-os-text transition-colors">apply</button>
+              <button onClick={() => handleNoteFeedback(false)} className="text-os-muted hover:text-os-text transition-colors">dismiss</button>
+            </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select label="Type" value={noteForm.type} onChange={e => setNoteForm(f => ({ ...f, type: e.target.value }))}>

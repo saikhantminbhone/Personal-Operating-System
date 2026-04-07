@@ -122,6 +122,8 @@ export const aiApi = {
     api.post('/ai/suggest/goal', { taskTitle }),
   semanticSearch: (query: string, results: any[]) =>
     api.post('/ai/search/semantic', { query, results }),
+  recordFeedback: (feature: string, input: string, suggestion: string, accepted: boolean) =>
+    api.post('/ai/feedback', { feature, input, suggestion, accepted }),
 }
 
 // ── HABITS ────────────────────────────────────────────────────────────────────
