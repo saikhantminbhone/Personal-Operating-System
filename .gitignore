@@ -9,5 +9,4 @@ dist
 coverage
 .DS_Store
 # Cloudflare Pages build output (marketing static export)
-out
 .wrangler
