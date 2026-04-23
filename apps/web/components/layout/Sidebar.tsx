@@ -9,8 +9,9 @@ import { api } from '@/lib/api'
 import {
   LayoutDashboard, Target, CheckSquare, BookOpen,
   FolderKanban, BarChart3, Bot, Settings, LogOut,
-  ChevronLeft, ChevronRight, Hexagon, PiggyBank,
-  Repeat2, CreditCard, Users, Key, X, CalendarDays
+  ChevronLeft, ChevronRight, PiggyBank,
+  Repeat2, CreditCard, Users, Key, X, CalendarDays,
+  NotebookPen
 } from 'lucide-react'
 
 const NAV_MAIN = [
@@ -19,6 +20,7 @@ const NAV_MAIN = [
   { href: '/dashboard/tasks',      icon: CheckSquare,     label: 'Tasks' },
   { href: '/dashboard/habits',     icon: Repeat2,         label: 'Habits' },
   { href: '/dashboard/planner',    icon: CalendarDays,    label: 'Planner' },
+  { href: '/dashboard/journal',    icon: NotebookPen,     label: 'Journal' },
   { href: '/dashboard/knowledge',  icon: BookOpen,        label: 'Knowledge' },
   { href: '/dashboard/finance',    icon: PiggyBank,       label: 'Finance' },
   { href: '/dashboard/projects',   icon: FolderKanban,    label: 'Projects' },
@@ -73,7 +75,7 @@ export function Sidebar() {
     <>
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-4 border-b border-os-border h-14">
-        <Hexagon className="w-6 h-6 text-os-accent flex-shrink-0" strokeWidth={1.5} />
+        <img src="/logo.svg" alt="Saikhant OS" className="w-6 h-6 flex-shrink-0" />
         {!sidebarCollapsed && (
           <span className="font-mono text-xs font-bold tracking-[0.3em] uppercase text-os-accent truncate">
             SAIKHANT OS
@@ -156,7 +158,7 @@ export function Sidebar() {
         style={{ transform: 'translateX(-100%)' }}>
         <div className="flex items-center justify-between px-4 py-4 border-b border-os-border">
           <div className="flex items-center gap-2">
-            <Hexagon className="w-5 h-5 text-os-accent" strokeWidth={1.5} />
+            <img src="/logo.svg" alt="Saikhant OS" className="w-5 h-5" />
             <span className="font-mono text-xs font-bold tracking-[0.3em] uppercase text-os-accent">SAIKHANT OS</span>
           </div>
           <button onClick={closeMobileSidebar} className="text-os-muted hover:text-os-text p-2 touch-manipulation">

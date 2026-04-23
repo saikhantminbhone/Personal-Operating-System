@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { Topbar } from '@/components/layout/Topbar'
 import { CheckinModal } from '@/components/layout/CheckinModal'
 import { CommandPalette } from '@/components/layout/CommandPalette'
+import { GlobalModals } from '@/components/layout/GlobalModals'
 import { Toast } from '@/components/ui/Toast'
 import { PWAInstallPrompt } from '@/components/ui/PWAInstallPrompt'
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator'
@@ -65,6 +66,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <CheckinModal />
       <CommandPalette />
+      <GlobalModals />
       <Toast />
       <OfflineIndicator />
       <PWAInstallPrompt />

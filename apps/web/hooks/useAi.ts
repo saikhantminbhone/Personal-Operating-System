@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { aiApi, getAuthToken } from '@/lib/api'
 import { useState, useCallback } from 'react'
+import { useAppStore } from '@/store/useAppStore'
 
 export function useAiBriefing() {
   return useQuery({
@@ -14,9 +15,12 @@ export function useAiChat() {
   const [history, setHistory] = useState<any[]>([])
   const [streamingText, setStreamingText] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  const [isThinking, setIsThinking] = useState(false)  // waiting for first token
+  const aiProvider = useAppStore(s => s.aiProvider)
 
   const sendMessage = useCallback(async (message: string) => {
     setIsStreaming(true)
+    setIsThinking(true)
     setStreamingText('')
 
     // Optimistically add user message to history
@@ -44,7 +48,7 @@ export function useAiChat() {
           'Content-Type': 'application/json',
           ...(authHeader ? { Authorization: authHeader } : {}),
         },
-        body: JSON.stringify({ message, conversationHistory: history }),
+        body: JSON.stringify({ message, conversationHistory: history, provider: aiProvider }),
       })
 
       if (!res.ok || !res.body) {
@@ -67,39 +71,46 @@ export function useAiChat() {
           try {
             const data = JSON.parse(line.slice(6))
             if (data.type === 'chunk' && data.text) {
+              if (accumulated === '') setIsThinking(false) // first token — stop thinking state
               accumulated += data.text
               setStreamingText(accumulated)
             } else if (data.type === 'done') {
               const finalHistory = data.conversationHistory || [...newHistory, { role: 'assistant', content: accumulated }]
               setStreamingText('')
               setHistory(finalHistory)
+            } else if (data.type === 'error') {
+              setIsThinking(false)
+              const retryMsg = data.retryAfter
+                ? `Rate limit reached — Gemini free tier is busy. Try again in ${data.retryAfter}s.`
+                : 'Something went wrong. Please try again.'
+              setHistory([...newHistory, { role: 'assistant', content: `⚠️ ${retryMsg}`, isError: true }])
+              setStreamingText('')
             }
           } catch {}
         }
       }
-    } catch (err) {
-      // Fallback to non-streaming on error
-      try {
-        const result: any = await aiApi.chat(message, history)
-        setHistory(result.conversationHistory || newHistory)
-        setStreamingText('')
-      } catch (fallbackErr: any) {
-        const msg = fallbackErr?.response?.data?.message || 'Failed to get a response. Please try again.'
-        setHistory([...newHistory, { role: 'assistant', content: `⚠ ${msg}` }])
-        setStreamingText('')
-      }
+    } catch (err: any) {
+      setIsThinking(false)
+      // Network/connection error (not an API error — those come via SSE error events)
+      const msg = err?.message?.includes('rate') || err?.message?.includes('quota')
+        ? '⚠️ Rate limit reached — please wait a moment and try again.'
+        : '⚠️ Connection failed. Check your network and try again.'
+      setHistory([...newHistory, { role: 'assistant', content: msg, isError: true }])
+      setStreamingText('')
     } finally {
       setIsStreaming(false)
+      setIsThinking(false)
       setStreamingText('')
     }
-  }, [history])
+  }, [history, aiProvider])
 
   return {
     sendMessage,
     history,
     streamingText,
     isStreaming,
-    clearHistory: () => { setHistory([]); setStreamingText('') },
+    isThinking,
+    clearHistory: () => { setHistory([]); setStreamingText(''); setIsThinking(false) },
   }
 }
 

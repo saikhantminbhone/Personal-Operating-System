@@ -17,9 +17,22 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Saikhant OS',
+    startupImage: '/logo.svg',
   },
   keywords: ['productivity', 'goals', 'habits', 'personal os', 'task manager', 'ai assistant'],
   authors: [{ name: 'Sai Khant Min Bhone', url: 'https://saikhant.com' }],
+  icons: {
+    icon: [
+      { url: '/logo.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-icon',
+  },
+  openGraph: {
+    title: 'Saikhant OS',
+    description: 'Your Personal Operating System',
+    images: [{ url: '/logo.svg' }],
+    type: 'website',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

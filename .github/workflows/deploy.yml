@@ -1,8 +1,11 @@
-name: Deploy to Production
+name: Deploy to AWS ECS (manual)
 
+# NOTE: AWS ECS is no longer the default deploy target — Cloudflare Pages took
+# over on push-to-main (see deploy-cloudflare.yml). This workflow is kept for
+# rollback / manual dispatch only. Re-add `push: { branches: [main] }` here if
+# you want ECS back as the auto deploy.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 env:
   NODE_VERSION: '20'

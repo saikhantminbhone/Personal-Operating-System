@@ -6,11 +6,11 @@ import { api, authApi } from '@/lib/api'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input, Select } from '@/components/ui/Input'
-import { useAppStore } from '@/store/useAppStore'
-import { ENERGY_META, PILLAR_META } from '@/lib/utils'
+import { useAppStore, type AiProvider } from '@/store/useAppStore'
+import { ENERGY_META, PILLAR_META, cn } from '@/lib/utils'
 import {
   User, Bell, Shield, Palette, Download, Trash2,
-  ExternalLink, Check, Zap, Globe, Moon
+  ExternalLink, Check, Zap, Globe, Moon, Bot
 } from 'lucide-react'
 
 const TIMEZONES = [
@@ -58,6 +58,7 @@ export default function SettingsPage() {
   })
 
   const { data: stats } = useQuery<any>({ queryKey: ['analytics', 'dashboard'], queryFn: () => api.get('/analytics/dashboard') })
+  const { aiProvider, setAiProvider } = useAppStore()
 
   function handleExport() {
     showToast('Export started — check your email shortly', 'info')
@@ -214,10 +215,33 @@ export default function SettingsPage() {
             <Card>
               <CardHeader><CardTitle>🤖 AI Configuration</CardTitle></CardHeader>
               <div className="space-y-3">
+                {/* Provider switch */}
+                <div className="p-3 bg-white/[0.02] border border-os-border rounded-lg space-y-2">
+                  <p className="text-xs font-mono text-os-text">AI Provider</p>
+                  <p className="text-[10px] font-mono text-os-muted mb-2">Switch between providers. Both require an API key.</p>
+                  <div className="flex rounded-lg border border-os-border overflow-hidden w-fit">
+                    {(['chatgpt', 'claude'] as AiProvider[]).map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setAiProvider(p)}
+                        className={cn(
+                          'px-4 py-2 text-[10px] font-mono tracking-wide transition-all border-r last:border-r-0 border-os-border',
+                          aiProvider === p
+                            ? p === 'chatgpt'
+                              ? 'bg-green-500/20 text-green-400'
+                              : 'bg-os-accent/15 text-os-accent'
+                            : 'text-os-muted hover:text-os-text'
+                        )}
+                      >
+                        {p === 'chatgpt' ? '✦ ChatGPT (gpt-4o-mini)' : '◆ Claude (Sonnet)'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex items-center justify-between p-3 bg-white/[0.02] border border-os-border rounded-lg">
                   <div>
                     <p className="text-xs font-mono text-os-text">AI Daily Briefing</p>
-                    <p className="text-[10px] font-mono text-os-muted">Generated on demand using Claude API</p>
+                    <p className="text-[10px] font-mono text-os-muted">Generated on demand</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-os-success animate-pulse" />
@@ -227,7 +251,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between p-3 bg-white/[0.02] border border-os-border rounded-lg">
                   <div>
                     <p className="text-xs font-mono text-os-text">AI Chat Assistant</p>
-                    <p className="text-[10px] font-mono text-os-muted">Full context awareness of your OS data</p>
+                    <p className="text-[10px] font-mono text-os-muted">Full context of your OS data</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-os-success animate-pulse" />
@@ -235,7 +259,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <p className="text-[10px] font-mono text-os-muted">
-                  Powered by Anthropic Claude (claude-sonnet-4). Your data is never used to train AI models.
+                  Your data is never used to train AI models.
                 </p>
               </div>
             </Card>

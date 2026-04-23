@@ -1,15 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Response } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { PrismaService } from '../../common/prisma/prisma.service'
+
+export type AiProvider = 'claude' | 'chatgpt'
 
 @Injectable()
 export class AiService {
   private anthropic: Anthropic
+  private openai: OpenAI
   private readonly logger = new Logger(AiService.name)
 
   constructor(private prisma: PrismaService) {
     this.anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
   }
 
   // ── Rich context builder ────────────────────────────────────────────────────
@@ -118,49 +123,47 @@ export class AiService {
   // ── Briefing ────────────────────────────────────────────────────────────────
 
   async getDailyBriefing(userId: string) {
-    const [context, user, goals, tasks, habits] = await Promise.all([
-      this.buildUserContext(userId),
+    const [user, goals, tasks, habits, habitLogs] = await Promise.all([
       this.prisma.user.findUnique({ where: { id: userId } }),
-      this.prisma.goal.findMany({ where: { userId, deletedAt: null, status: 'ACTIVE' }, take: 5 }),
-      this.prisma.task.findMany({ where: { userId, deletedAt: null, status: { in: ['TODO', 'IN_PROGRESS'] } }, take: 10 }),
-      this.prisma.habit.findMany({ where: { userId, archivedAt: null }, take: 5 }),
+      this.prisma.goal.findMany({ where: { userId, deletedAt: null, status: 'ACTIVE' }, take: 4, select: { title: true, progress: true } }),
+      this.prisma.task.findMany({ where: { userId, deletedAt: null, status: { in: ['TODO', 'IN_PROGRESS'] } }, orderBy: [{ priority: 'desc' }], take: 5, select: { title: true, priority: true } }),
+      this.prisma.habit.findMany({ where: { userId, archivedAt: null }, take: 5, select: { title: true, currentStreak: true } }),
+      this.prisma.habitLog.findMany({ where: { userId, completedAt: { gte: new Date(new Date().setHours(0,0,0,0)) } }, select: { habitId: true } }),
     ])
 
-    const prompt = `You are the AI layer of ${user?.name}'s Personal Operating System. Generate a concise, motivating daily briefing.
+    const energyLabels = ['Drained', 'Low', 'Moderate', 'Peak']
+    const energy = user?.energyLevel != null ? energyLabels[user.energyLevel] : 'unknown'
+    const completedToday = habitLogs.length
 
-USER CONTEXT:
-${context}
+    // Compact context — minimal tokens
+    const ctx = [
+      `${user?.name} | Energy:${energy} | Streak:${user?.streakCount}d`,
+      goals.length ? `Goals: ${goals.map(g => `${g.title}(${g.progress}%)`).join(', ')}` : '',
+      tasks.length ? `Top tasks: ${tasks.slice(0,3).map(t => t.title).join(', ')}` : '',
+      habits.length ? `Habits: ${completedToday}/${habits.length} done today` : '',
+    ].filter(Boolean).join('\n')
 
-Generate a JSON response with these exact fields:
-{
-  "greeting": "personalized energetic greeting based on energy level and streak",
-  "focusSuggestion": "one clear focus recommendation for today based on goals and energy",
-  "topTasksTitles": ["task1", "task2", "task3"],
-  "goalInsight": "one specific insight about goal progress — reference actual numbers",
-  "habitReminder": "which habit to prioritize today and why",
-  "motivationalNote": "short, genuine motivational message — not generic, reference their actual situation"
-}
-
-Respond ONLY with valid JSON, no other text.`
+    const prompt = `Briefing for personal OS user. Context:\n${ctx}\n\nReply ONLY valid JSON:\n{"greeting":"...","focusSuggestion":"...","topTasksTitles":["..."],"goalInsight":"...","habitReminder":"...","motivationalNote":"..."}`
 
     try {
-      const response = await this.anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 800,
+      const res = await this.openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        max_tokens: 400,
+        temperature: 0.7,
+        response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: prompt }],
       })
-      const text = response.content[0].type === 'text' ? response.content[0].text : ''
-      const briefing = JSON.parse(text)
+      const briefing = JSON.parse(res.choices[0]?.message?.content || '{}')
       return { ...briefing, date: new Date().toISOString(), energyLevel: user?.energyLevel }
     } catch (err) {
       this.logger.error('AI briefing failed', err)
       return {
-        greeting: `Good morning, ${user?.name}! Ready to make progress today?`,
-        focusSuggestion: 'Focus on your highest priority task first.',
+        greeting: `Good ${new Date().getHours() < 12 ? 'morning' : 'afternoon'}, ${user?.name}!`,
+        focusSuggestion: tasks[0]?.title || 'Focus on your highest priority task.',
         topTasksTitles: tasks.slice(0, 3).map(t => t.title),
-        goalInsight: `You have ${goals.length} active goals. Keep pushing.`,
-        habitReminder: habits[0]?.title || 'Stay consistent with your habits.',
-        motivationalNote: 'Every small step compounds into big results.',
+        goalInsight: goals.length ? `${goals.length} active goals — keep pushing.` : 'Set your first goal today.',
+        habitReminder: habits[0]?.title || 'Build your habits.',
+        motivationalNote: 'Every small step compounds.',
         date: new Date().toISOString(),
         energyLevel: user?.energyLevel,
       }
@@ -169,26 +172,33 @@ Respond ONLY with valid JSON, no other text.`
 
   // ── Chat (non-streaming, kept for backwards compat) ─────────────────────────
 
-  async chat(userId: string, message: string, conversationHistory: any[] = []) {
+  async chat(userId: string, message: string, conversationHistory: any[] = [], provider: AiProvider = 'claude') {
     const [context, user] = await Promise.all([
       this.buildUserContext(userId),
       this.prisma.user.findUnique({ where: { id: userId } }),
     ])
 
-    const systemPrompt = this.buildSystemPrompt(user?.name || 'User', context)
+    const name = user?.name || 'User'
+    const systemPrompt = this.buildSystemPrompt(name, context)
+    const safeHistory = this.sanitizeMessages(conversationHistory.slice(-10))
     const messages = [
-      ...conversationHistory.slice(-10),
+      ...safeHistory,
       { role: 'user' as const, content: message },
     ]
 
-    const response = await this.anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1500,
-      system: systemPrompt,
-      messages,
-    })
+    let aiMessage = ''
 
-    const aiMessage = response.content[0].type === 'text' ? response.content[0].text : ''
+    if (provider === 'chatgpt') {
+      aiMessage = await this.openaiChat(systemPrompt, messages)
+    } else {
+      const response = await this.anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages,
+      })
+      aiMessage = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
 
     await this.prisma.aiMessage.createMany({
       data: [
@@ -203,17 +213,44 @@ Respond ONLY with valid JSON, no other text.`
     }
   }
 
+  // ── OpenAI message sanitizer ────────────────────────────────────────────────
+  // Strips any message where role is missing/invalid before sending to OpenAI.
+  // JSON.stringify silently drops `undefined` fields, so `{ role: undefined }`
+  // becomes `{}` over the wire — OpenAI rejects it with a 400.
+  private sanitizeMessages(raw: any[]): Array<{ role: 'user' | 'assistant'; content: string }> {
+    return raw
+      .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+  }
+
+  // ── OpenAI / ChatGPT helper ─────────────────────────────────────────────────
+  // gpt-4o-mini: fast, cheap ($0.15/1M input tokens), great for chat
+
+  private async openaiChat(systemPrompt: string, messages: any[]): Promise<string> {
+    const response = await this.openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      max_tokens: 1500,
+      messages: [
+        { role: 'system' as const, content: systemPrompt },
+        ...this.sanitizeMessages(messages),
+      ],
+    })
+    return response.choices[0]?.message?.content || ''
+  }
+
   // ── Streaming chat ──────────────────────────────────────────────────────────
 
-  async chatStream(userId: string, message: string, conversationHistory: any[] = [], res: Response) {
+  async chatStream(userId: string, message: string, conversationHistory: any[] = [], res: Response, provider: AiProvider = 'claude') {
     const [context, user] = await Promise.all([
       this.buildUserContext(userId),
       this.prisma.user.findUnique({ where: { id: userId } }),
     ])
 
-    const systemPrompt = this.buildSystemPrompt(user?.name || 'User', context)
+    const name = user?.name || 'User'
+    const systemPrompt = this.buildSystemPrompt(name, context)
+    const safeHistory = this.sanitizeMessages(conversationHistory.slice(-10))
     const messages = [
-      ...conversationHistory.slice(-10),
+      ...safeHistory,
       { role: 'user' as const, content: message },
     ]
 
@@ -227,18 +264,38 @@ Respond ONLY with valid JSON, no other text.`
     let fullText = ''
 
     try {
-      const stream = await this.anthropic.messages.stream({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system: systemPrompt,
-        messages,
-      })
-
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          const chunk = event.delta.text
-          fullText += chunk
-          res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunk })}\n\n`)
+      if (provider === 'chatgpt') {
+        // OpenAI streaming — messages already sanitized above
+        const stream = await this.openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          max_tokens: 1500,
+          stream: true,
+          messages: [
+            { role: 'system' as const, content: systemPrompt },
+            ...messages, // already typed as { role: 'user'|'assistant', content: string }
+          ],
+        })
+        for await (const chunk of stream) {
+          const text = chunk.choices[0]?.delta?.content || ''
+          if (text) {
+            fullText += text
+            res.write(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`)
+          }
+        }
+      } else {
+        // Claude streaming
+        const stream = await this.anthropic.messages.stream({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          system: systemPrompt,
+          messages,
+        })
+        for await (const event of stream) {
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+            const chunk = event.delta.text
+            fullText += chunk
+            res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunk })}\n\n`)
+          }
         }
       }
 
@@ -251,9 +308,11 @@ Respond ONLY with valid JSON, no other text.`
       })
 
       res.write(`data: ${JSON.stringify({ type: 'done', conversationHistory: [...messages, { role: 'assistant', content: fullText }] })}\n\n`)
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Stream chat failed', err)
-      res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream failed' })}\n\n`)
+      // Surface rate-limit retry delay if present (OpenAI includes it in error headers)
+      const retryAfter = err?.headers?.['retry-after'] ? parseInt(err.headers['retry-after'], 10) : null
+      res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream failed', retryAfter })}\n\n`)
     } finally {
       res.end()
     }
@@ -284,130 +343,51 @@ Format with markdown when helpful (bullet points, bold for key items).`
 
   // ── Phase 2: Intelligence Layer ─────────────────────────────────────────────
 
-  async categorizeTransaction(userId: string, description: string, amount: number, txType: string) {
-    const [categories, feedbackCtx] = await Promise.all([
-      this.prisma.financeCategory.findMany({ where: { userId }, select: { name: true } }),
-      this.loadFeedbackContext(userId, 'tx_categorization'),
-    ])
-    const categoryNames = categories.map(c => c.name).join(', ')
-
-    const prompt = `Categorize this ${txType.toLowerCase()} transaction for a personal finance tracker.
-Description: "${description}"
-Amount: ${(amount / 100).toFixed(2)}
-Existing categories: ${categoryNames || 'none yet'}${feedbackCtx}
-
-Return JSON only:
-{ "category": "category name", "isNew": boolean, "icon": "single emoji", "confidence": 0.0 }
-
-Use an existing category if it fits. Keep names short (1-2 words). Confidence 0-1.
-Respond ONLY with valid JSON.`
-
+  // ── Shared gpt-4o-mini JSON helper ──────────────────────────────────────────
+  private async gptJson<T>(prompt: string, maxTokens = 120, fallback: T): Promise<T> {
     try {
-      const response = await this.anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 100,
+      const res = await this.openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        max_tokens: maxTokens,
+        temperature: 0,
+        response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: prompt }],
       })
-      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
-      return JSON.parse(text)
+      return JSON.parse(res.choices[0]?.message?.content || '{}') as T
     } catch {
-      return { category: 'Other', isNew: false, icon: '💸', confidence: 0.5 }
+      return fallback
     }
+  }
+
+  async categorizeTransaction(userId: string, description: string, amount: number, txType: string) {
+    const categories = await this.prisma.financeCategory.findMany({ where: { userId }, select: { name: true } })
+    const cats = categories.map(c => c.name).join(', ') || 'none'
+    const prompt = `Categorize: "${description}" ${txType} $${(amount/100).toFixed(2)}. Categories: ${cats}.\nJSON: {"category":"name","isNew":bool,"icon":"emoji","confidence":0.0}`
+    return this.gptJson(prompt, 60, { category: 'Other', isNew: false, icon: '💸', confidence: 0.5 })
   }
 
   async categorizeNote(userId: string, title: string, content: string) {
-    const [collections, feedbackCtx] = await Promise.all([
-      this.prisma.collection.findMany({ where: { userId }, select: { id: true, name: true } }),
-      this.loadFeedbackContext(userId, 'note_categorization'),
-    ])
-
-    const prompt = `Analyze this note and suggest how to organize it.
-Title: "${title}"
-Content (first 400 chars): "${(content || '').slice(0, 400)}"
-Available collections: ${collections.length ? collections.map(c => `"${c.name}" [id:${c.id}]`).join(', ') : 'none'}${feedbackCtx}
-
-Return JSON only:
-{
-  "collectionId": "existing-id or null",
-  "tags": ["tag1", "tag2", "tag3"],
-  "summary": "one sentence"
-}
-
-Match to an existing collection if it fits. Tags should be 1-2 words, 2-3 max.
-Respond ONLY with valid JSON.`
-
-    try {
-      const response = await this.anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        messages: [{ role: 'user', content: prompt }],
-      })
-      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
-      return JSON.parse(text)
-    } catch {
-      return { collectionId: null, tags: [], summary: '' }
-    }
+    const collections = await this.prisma.collection.findMany({ where: { userId }, select: { id: true, name: true } })
+    const cols = collections.map(c => `"${c.name}"[${c.id}]`).join(', ') || 'none'
+    const snippet = (content || '').slice(0, 200)
+    const prompt = `Note: "${title}" — ${snippet}\nCollections: ${cols}\nJSON: {"collectionId":"id or null","tags":["tag"],"summary":"one sentence"}`
+    return this.gptJson(prompt, 100, { collectionId: null, tags: [], summary: '' })
   }
 
   async suggestGoalForTask(userId: string, taskTitle: string) {
-    const [goals, feedbackCtx] = await Promise.all([
-      this.prisma.goal.findMany({ where: { userId, deletedAt: null, status: 'ACTIVE' }, select: { id: true, title: true, pillar: true } }),
-      this.loadFeedbackContext(userId, 'goal_suggestion'),
-    ])
-
+    const goals = await this.prisma.goal.findMany({ where: { userId, deletedAt: null, status: 'ACTIVE' }, select: { id: true, title: true, pillar: true } })
     if (!goals.length) return { goalId: null, goalTitle: null, confidence: 0 }
-
-    const prompt = `Match this task to the most relevant active goal, if any.
-Task: "${taskTitle}"
-Goals: ${goals.map(g => `"${g.title}" (${g.pillar}) [id:${g.id}]`).join(' | ')}${feedbackCtx}
-
-Return JSON only: { "goalId": "id or null", "goalTitle": "title or null", "confidence": 0.0 }
-Only suggest a goal if confidence > 0.65. Otherwise return null for both.
-Respond ONLY with valid JSON.`
-
-    try {
-      const response = await this.anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 80,
-        messages: [{ role: 'user', content: prompt }],
-      })
-      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
-      return JSON.parse(text)
-    } catch {
-      return { goalId: null, goalTitle: null, confidence: 0 }
-    }
+    const prompt = `Task: "${taskTitle}"\nGoals: ${goals.map(g => `"${g.title}"[${g.id}]`).join(' | ')}\nBest match? JSON: {"goalId":"id or null","goalTitle":"title or null","confidence":0.0} — null if confidence<0.65`
+    return this.gptJson(prompt, 60, { goalId: null, goalTitle: null, confidence: 0 })
   }
 
   async semanticSearch(userId: string, query: string, results: any[]) {
     if (!results.length) return { results: [], intent: null, topInsight: null }
-
-    const prompt = `User searched for: "${query}"
-Search results:
-${results.map((r, i) => `[${i}] ${r.entityType}: "${r.title}" — ${r.subtitle || ''}`).join('\n')}
-
-Re-rank by semantic relevance. What is the user trying to find?
-
-Return JSON only:
-{
-  "rankedIndexes": [0, 1, 2, ...],
-  "intent": "brief description of what user wants",
-  "topInsight": "one helpful observation about the top result (or null)"
-}
-Respond ONLY with valid JSON.`
-
-    try {
-      const response = await this.anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 200,
-        messages: [{ role: 'user', content: prompt }],
-      })
-      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
-      const { rankedIndexes, intent, topInsight } = JSON.parse(text)
-      const ranked = (rankedIndexes as number[] || []).map(i => results[i]).filter(Boolean)
-      return { results: ranked.length ? ranked : results, intent, topInsight }
-    } catch {
-      return { results, intent: null, topInsight: null }
-    }
+    const items = results.slice(0, 10).map((r, i) => `[${i}]${r.entityType}:"${r.title}"`).join(' ')
+    const prompt = `Query:"${query}" Results:${items}\nJSON: {"rankedIndexes":[0,1,2],"intent":"brief","topInsight":"or null"}`
+    const data = await this.gptJson<any>(prompt, 120, { rankedIndexes: [], intent: null, topInsight: null })
+    const ranked = ((data.rankedIndexes || []) as number[]).map(i => results[i]).filter(Boolean)
+    return { results: ranked.length ? ranked : results, intent: data.intent, topInsight: data.topInsight }
   }
 
   // ── Feedback recording ──────────────────────────────────────────────────────

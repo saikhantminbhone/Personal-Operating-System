@@ -18,7 +18,8 @@ import { Sparkles } from 'lucide-react'
 export default function TasksPage() {
   const [filter, setFilter] = useState<string>('active')
   const [createOpen, setCreateOpen] = useState(false)
-  const [form, setForm] = useState({ title: '', goalId: '', priority: 'MEDIUM', energyRequired: 2, estimatedMinutes: '', dueDate: '', tags: '' })
+  const todayISO = new Date().toISOString().slice(0, 10)
+  const [form, setForm] = useState({ title: '', goalId: '', priority: 'MEDIUM', energyRequired: 2, estimatedMinutes: '', dueDate: todayISO, tags: '' })
 
   const params = filter === 'active' ? { status: undefined } : filter === 'done' ? { status: 'DONE' } : {}
   const { data: taskData, isLoading } = useTasks(filter === 'active' ? { status: 'TODO' } : filter === 'in_progress' ? { status: 'IN_PROGRESS' } : filter === 'done' ? { status: 'DONE' } : {})
@@ -64,7 +65,7 @@ export default function TasksPage() {
         tags: form.tags ? form.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
       })
       setCreateOpen(false)
-      setForm({ title: '', goalId: '', priority: 'MEDIUM', energyRequired: 2, estimatedMinutes: '', dueDate: '', tags: '' })
+      setForm({ title: '', goalId: '', priority: 'MEDIUM', energyRequired: 2, estimatedMinutes: '', dueDate: todayISO, tags: '' })
       showToast('Task added ✓')
     } catch (err: any) {
       showToast(err.message || 'Failed to create task', 'error')
@@ -122,14 +123,28 @@ export default function TasksPage() {
       <div className="space-y-2">
         {isLoading && <div className="text-xs font-mono text-os-muted animate-pulse">Loading tasks...</div>}
         {tasks.map(task => (
-          <div key={task.id} className={`flex items-center gap-3 p-4 rounded-lg border transition-all group ${
+          <div key={task.id} className={`flex items-stretch gap-0 rounded-xl border transition-all group overflow-hidden ${
             task.status === 'DONE' ? 'bg-white/[0.01] border-os-border opacity-40' : 'bg-white/[0.03] border-os-border hover:border-os-accent/20'
           }`}>
-            <button onClick={() => task.status !== 'DONE' && handleComplete(task.id)}
-              className="flex-shrink-0 text-os-muted hover:text-os-success transition-colors">
-              {task.status === 'DONE' ? <CheckCircle className="w-4 h-4 text-os-success" /> : <Circle className="w-4 h-4" />}
+            {/* Complete button — full-height tap area */}
+            <button
+              onClick={() => task.status !== 'DONE' && handleComplete(task.id)}
+              disabled={task.status === 'DONE'}
+              className={`flex-shrink-0 flex items-center justify-center w-14 border-r border-os-border transition-all touch-manipulation ${
+                task.status === 'DONE'
+                  ? 'bg-os-success/5 cursor-default'
+                  : 'hover:bg-os-success/10 active:bg-os-success/20 cursor-pointer'
+              }`}
+              title={task.status === 'DONE' ? 'Completed' : 'Mark as done'}
+            >
+              {task.status === 'DONE'
+                ? <CheckCircle className="w-5 h-5 text-os-success" />
+                : <Circle className="w-5 h-5 text-os-muted group-hover:text-os-success transition-colors" />
+              }
             </button>
-            <div className="flex-1 min-w-0">
+
+            {/* Content */}
+            <div className="flex-1 min-w-0 px-4 py-3">
               <p className={`text-sm font-mono ${task.status === 'DONE' ? 'line-through text-os-muted' : 'text-os-text'}`}>
                 {task.title}
               </p>
@@ -142,14 +157,16 @@ export default function TasksPage() {
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+
+            {/* Right actions */}
+            <div className="flex items-center gap-2 pr-3 flex-shrink-0">
               <PriorityBadge priority={task.priority} />
-              <span className="text-xs" title={`Energy: ${ENERGY_META[task.energyRequired]?.label}`}>
+              <span className="text-sm hidden sm:block" title={`Energy: ${ENERGY_META[task.energyRequired]?.label}`}>
                 {ENERGY_META[task.energyRequired]?.icon}
               </span>
               <button onClick={() => handleDelete(task.id)}
-                className="text-os-muted hover:text-os-danger transition-colors sm:opacity-0 sm:group-hover:opacity-100">
-                <Trash2 className="w-3 h-3" />
+                className="text-os-muted hover:text-os-danger transition-colors p-1 touch-manipulation sm:opacity-0 sm:group-hover:opacity-100">
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

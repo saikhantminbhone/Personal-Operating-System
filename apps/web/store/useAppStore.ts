@@ -3,11 +3,14 @@ import { persist } from 'zustand/middleware'
 
 interface Toast { message: string; type: 'success' | 'error' | 'info' }
 
+export type AiProvider = 'claude' | 'chatgpt'
+
 interface AppState {
   sidebarCollapsed: boolean
   mobileMenuOpen: boolean
   activeModal: string | null
   toast: Toast | null
+  aiProvider: AiProvider
   // Actions
   toggleSidebar: () => void
   setSidebarCollapsed: (val: boolean) => void
@@ -15,6 +18,7 @@ interface AppState {
   setModal: (modal: string | null) => void
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void
   clearToast: () => void
+  setAiProvider: (provider: AiProvider) => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -24,6 +28,7 @@ export const useAppStore = create<AppState>()(
       mobileMenuOpen: false,
       activeModal: null,
       toast: null,
+      aiProvider: 'chatgpt',
 
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: (val) => set({ sidebarCollapsed: val }),
@@ -35,10 +40,11 @@ export const useAppStore = create<AppState>()(
         setTimeout(() => set({ toast: null }), 3500)
       },
       clearToast: () => set({ toast: null }),
+      setAiProvider: (provider) => set({ aiProvider: provider }),
     }),
     {
       name: 'saikhant-os-app',
-      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed }),
+      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, aiProvider: s.aiProvider }),
     }
   )
 )

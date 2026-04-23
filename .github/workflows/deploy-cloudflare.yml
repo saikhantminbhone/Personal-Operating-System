@@ -1,0 +1,65 @@
+name: Deploy Marketing Site to Cloudflare Pages (backup / manual)
+
+# Primary deploy path is Cloudflare Pages' Git integration — CF clones the
+# repo itself and builds on every push to main. This workflow is kept as a
+# MANUAL backup: run it from the Actions tab if the CF Git integration is
+# down or you need to deploy a specific SHA without pushing.
+#
+# To re-enable automatic push-based deploys via GitHub Actions (e.g. if you
+# disconnect CF's Git integration later), uncomment the `push:` block below.
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'apps/marketing/**'
+  #     - 'pnpm-lock.yaml'
+  #     - '.github/workflows/deploy-cloudflare.yml'
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with: { version: '${{ env.PNPM_VERSION }}' }
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: 'pnpm' }
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # Public env vars are baked into the static HTML at build time.
+      # NEXT_PUBLIC_APP_URL is the URL of the real app (e.g. https://app.saikhantlabs.com)
+      # — marketing "Sign up" / "Login" buttons link to it.
+      - name: Build static marketing site
+        working-directory: apps/marketing
+        env:
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+          NODE_ENV: production
+        run: pnpm build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/marketing
+          command: pages deploy out --project-name=saikhant-labs-os-marketing --branch=main
+
+      - name: Deployment summary
+        run: |
+          echo "Deployed commit ${{ github.sha }} to Cloudflare Pages."
+          echo "See the Pages dashboard for the assigned URL."

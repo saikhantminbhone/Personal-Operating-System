@@ -3,12 +3,14 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
 import { IsString, IsArray, IsOptional, IsNumber, IsBoolean } from 'class-validator'
 import { Response } from 'express'
 import { AiService } from './ai.service'
+import type { AiProvider } from './ai.service'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
 
 class ChatDto {
   @IsString() message: string
   @IsOptional() @IsArray() conversationHistory?: any[]
+  @IsOptional() @IsString() provider?: AiProvider
 }
 
 class CategorizeTxDto {
@@ -54,13 +56,13 @@ export class AiController {
   @Post('chat')
   @ApiOperation({ summary: 'Chat with AI assistant (non-streaming)' })
   chat(@CurrentUser() user: any, @Body() dto: ChatDto) {
-    return this.ai.chat(user.id, dto.message, dto.conversationHistory)
+    return this.ai.chat(user.id, dto.message, dto.conversationHistory, dto.provider || 'claude')
   }
 
   @Post('chat/stream')
   @ApiOperation({ summary: 'Chat with AI assistant (SSE streaming)' })
   async chatStream(@CurrentUser() user: any, @Body() dto: ChatDto, @Res() res: Response) {
-    return this.ai.chatStream(user.id, dto.message, dto.conversationHistory, res)
+    return this.ai.chatStream(user.id, dto.message, dto.conversationHistory, res, dto.provider || 'claude')
   }
 
   @Get('chat/history')

@@ -95,10 +95,12 @@ export class TasksService {
     })
   }
 
-  async update(userId: string, id: string, dto: UpdateTaskDto) {
+  async update(userId: string, id: string, dto: UpdateTaskDto & { clearDueDate?: boolean }) {
     await this.assertOwner(userId, id)
     const data: any = { ...dto }
-    if (dto.dueDate) data.dueDate = new Date(dto.dueDate)
+    delete data.clearDueDate
+    if (dto.clearDueDate) data.dueDate = null
+    else if (dto.dueDate) data.dueDate = new Date(dto.dueDate)
     if (dto.status === 'DONE') data.completedAt = new Date()
     if (dto.status && dto.status !== 'DONE') data.completedAt = null
 

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Background -->
+  <rect width="200" height="200" rx="40" fill="#0D1520"/>
+
+  <!-- Grid dots (circuit board aesthetic) -->
+  <circle cx="30" cy="30" r="2.5" fill="#64ffda" opacity="0.35"/>
+  <circle cx="170" cy="30" r="2.5" fill="#64ffda" opacity="0.35"/>
+  <circle cx="30" cy="170" r="2.5" fill="#64ffda" opacity="0.35"/>
+  <circle cx="170" cy="170" r="2.5" fill="#64ffda" opacity="0.35"/>
+  <circle cx="100" cy="30" r="2" fill="#64ffda" opacity="0.2"/>
+  <circle cx="100" cy="170" r="2" fill="#64ffda" opacity="0.2"/>
+  <circle cx="30" cy="100" r="2" fill="#64ffda" opacity="0.2"/>
+  <circle cx="170" cy="100" r="2" fill="#64ffda" opacity="0.2"/>
+
+  <!-- Corner tick lines -->
+  <line x1="30" y1="30" x2="50" y2="30" stroke="#64ffda" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="30" y1="30" x2="30" y2="50" stroke="#64ffda" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="170" y1="30" x2="150" y2="30" stroke="#64ffda" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="170" y1="30" x2="170" y2="50" stroke="#64ffda" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="30" y1="170" x2="50" y2="170" stroke="#64ffda" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="30" y1="170" x2="30" y2="150" stroke="#64ffda" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="170" y1="170" x2="150" y2="170" stroke="#64ffda" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="170" y1="170" x2="170" y2="150" stroke="#64ffda" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+
+  <!-- Outer ring glow -->
+  <circle cx="100" cy="100" r="56" stroke="#64ffda" stroke-width="1" opacity="0.12" fill="none"/>
+
+  <!-- Inner filled circle (logo base) -->
+  <circle cx="100" cy="100" r="44" fill="#0D1520" stroke="#64ffda" stroke-width="1.5" opacity="0.25"/>
+
+  <!-- S shape — two arcs forming the letter -->
+  <!-- Top arc of S -->
+  <path d="M118 80 C118 70 108 63 98 63 C84 63 76 72 76 81 C76 91 86 96 100 100"
+        stroke="#64ffda" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <!-- Bottom arc of S -->
+  <path d="M82 120 C82 130 92 137 102 137 C116 137 124 128 124 119 C124 109 114 104 100 100"
+        stroke="#64ffda" stroke-width="8" stroke-linecap="round" fill="none"/>
+
+  <!-- Center dot accent -->
+  <circle cx="100" cy="100" r="3" fill="#64ffda" opacity="0.8"/>
+
+  <!-- Subtle glow under the S -->
+  <ellipse cx="100" cy="100" rx="30" ry="8" fill="#64ffda" opacity="0.04"/>
+</svg>

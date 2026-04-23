@@ -536,4 +536,94 @@ docker-compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
 
 ---
 
+## Cloudflare Pages (marketing site only)
+
+The **marketing site** (`apps/marketing`) auto-deploys to **Cloudflare Pages** on every push to `main` via `.github/workflows/deploy-cloudflare.yml`. It's a static export — just HTML/CSS/JS served straight from Cloudflare's CDN. The main app (`apps/web`) and the NestJS API (`apps/api`) are deployed elsewhere and **are not touched by this workflow**.
+
+### Can I use the free plan?
+
+Yes — the free plan is ideal for a marketing site:
+
+- 500 builds/month (plenty for a marketing site)
+- Unlimited requests and bandwidth on `*.pages.dev` and custom domains
+- Free SSL on custom domains
+- Unlimited PR preview deployments
+- 1 concurrent build
+
+You'll only outgrow it if you push >500 deploys/month. Start free.
+
+### One-time Cloudflare dashboard setup
+
+1. **Create the Pages project**
+   - Log in at https://dash.cloudflare.com
+   - Workers & Pages → Create → Pages → **Create using direct upload** (not Git — GitHub Actions drives the deploys)
+   - Name: `saikhant-labs-os-marketing` (must match `apps/marketing/wrangler.toml` and the `--project-name` flag in the workflow)
+   - Click "Create project" — you'll get an empty project ready to accept uploads
+
+2. **Build settings** (Settings → Builds & deployments)
+   - Framework preset: **None** — we build in GitHub Actions, not on CF
+   - Compatibility date: `2024-09-23`
+   - Compatibility flags: **leave empty** — pure static site, no `nodejs_compat` needed
+   - Node.js version: `20`
+
+3. **Environment variables** (Settings → Environment variables, apply to both Production and Preview)
+   - `NEXT_PUBLIC_APP_URL` — URL of the real app (e.g. `https://app.saikhantlabs.com`). The marketing site's "Sign up" / "Login" buttons link here.
+   - That's it. The marketing site has no auth, no API calls, no secrets.
+
+4. **Get the API token for GitHub Actions**
+   - My Profile → API Tokens → Create Token → template **"Edit Cloudflare Workers"**
+   - Scope it to your account; copy the token
+   - Also grab your Account ID (right sidebar on any CF dashboard page)
+
+### GitHub repo secrets
+
+In the repo → Settings → Secrets and variables → Actions, add:
+
+| Secret                  | Value                                                                       |
+| ----------------------- | --------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`  | The token from step 4 above                                                 |
+| `CLOUDFLARE_ACCOUNT_ID` | Your CF account ID                                                          |
+| `NEXT_PUBLIC_APP_URL`   | Public URL of the main app (where marketing CTAs point)                     |
+
+`NEXT_PUBLIC_APP_URL` is baked into the static HTML at build time, so it's a GitHub secret (build-time) rather than a CF env var (runtime).
+
+### Custom domain
+
+1. Pages project → **Custom domains** → **Set up a custom domain** → enter `saikhantlabs.com` (or `www.saikhantlabs.com`)
+2. If the domain is already on Cloudflare, DNS wires itself automatically. If it's on another registrar, CF shows you the CNAME to add.
+3. Free SSL provisions in 1–3 minutes.
+4. No backend CORS changes needed — the marketing site doesn't call the API.
+
+### Local preview of the CF build
+
+```bash
+cd apps/marketing
+pnpm build            # emits static files to `out/`
+pnpm pages:preview    # serves `out/` locally under the CF Pages runtime
+```
+
+Regular `pnpm dev` still works for day-to-day work (port 3002). `pages:preview` is only useful if you want to sanity-check the static build before pushing.
+
+### First deploy checklist
+
+- [ ] Pages project `saikhant-labs-os-marketing` created in the CF dashboard
+- [ ] `NEXT_PUBLIC_APP_URL` set in the CF dashboard (Production + Preview)
+- [ ] `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `NEXT_PUBLIC_APP_URL` added as repo secrets
+- [ ] Push to `main` touching `apps/marketing/**` → GitHub Actions runs `deploy-cloudflare.yml` → site live at `https://saikhant-labs-os-marketing.pages.dev`
+- [ ] (Optional) Custom domain added in the CF dashboard
+
+### Rolling back
+
+Cloudflare Pages retains every deploy. In the Pages project, click any prior deployment → **Rollback**. Instant, no rebuild.
+
+### Gotchas (static export)
+
+- **`output: 'export'` in `apps/marketing/next.config.js`** means no server-side rendering, no `getServerSideProps`, no API routes, no middleware. If you want to add dynamic server logic later, switch to `@cloudflare/next-on-pages` and add the `nodejs_compat` compatibility flag in the CF dashboard.
+- **No `next/image` optimization** — `images.unoptimized: true` is set. If you add images, they'll be served as-is.
+- **`out/`** is gitignored — don't commit the build output.
+- **Environment variables are build-time only.** Anything in `NEXT_PUBLIC_*` gets baked into the HTML at `pnpm build` time. Change a URL → you need a redeploy.
+- **The main app and API are not affected.** Deploying the marketing site won't restart or touch anything on `apps/web` or `apps/api`.
+
+---
+
 _Saikhant Labs OS — Built by Sai Khant Min Bhone · saikhant.com_

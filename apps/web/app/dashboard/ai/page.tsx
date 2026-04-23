@@ -5,12 +5,14 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Send, Bot, User, Sparkles, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAppStore, type AiProvider } from '@/store/useAppStore'
 
 export default function AiPage() {
   const [input, setInput] = useState('')
   const [briefingOpen, setBriefingOpen] = useState(false)
-  const { sendMessage, isStreaming, streamingText, history, clearHistory } = useAiChat()
+  const { sendMessage, isStreaming, isThinking, streamingText, history, clearHistory } = useAiChat()
   const { data: briefing, refetch: refetchBriefing, isFetching } = useAiBriefing()
+  const { aiProvider, setAiProvider } = useAppStore()
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const messages = history.filter(m => m.role === 'user' || m.role === 'assistant')
@@ -122,7 +124,9 @@ export default function AiPage() {
             {messages.length === 0 && !isStreaming ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <Sparkles className="w-8 h-8 text-os-accent/40 mb-3" />
-                <p className="text-sm font-mono text-os-muted">Your AI chief of staff is ready.</p>
+                <p className="text-sm font-mono text-os-muted">
+                  {aiProvider === 'chatgpt' ? '✦ ChatGPT' : '◆ Claude'} is ready.
+                </p>
                 <p className="text-xs font-mono text-os-muted/60 mt-1 hidden sm:block">Ask me anything about your goals, tasks, or how to plan your day.</p>
                 {/* Mobile quick starters */}
                 <div className="sm:hidden mt-4 w-full space-y-2">
@@ -140,42 +144,57 @@ export default function AiPage() {
                   <div key={i} className={cn('flex gap-2 sm:gap-3', msg.role === 'user' && 'flex-row-reverse')}>
                     <div className={cn(
                       'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0',
-                      msg.role === 'user' ? 'bg-os-accent/20' : 'bg-os-surface border border-os-border'
+                      msg.role === 'user' ? 'bg-os-accent/20' : (msg as any).isError ? 'bg-os-danger/20' : 'bg-os-surface border border-os-border'
                     )}>
                       {msg.role === 'user'
                         ? <User className="w-3.5 h-3.5 text-os-accent" />
-                        : <Bot className="w-3.5 h-3.5 text-os-text" />
+                        : <Bot className={cn('w-3.5 h-3.5', (msg as any).isError ? 'text-os-danger' : 'text-os-text')} />
                       }
                     </div>
                     <div className={cn(
                       'max-w-[80%] sm:max-w-[75%] p-3 rounded-xl text-sm font-mono leading-relaxed whitespace-pre-wrap',
                       msg.role === 'user'
                         ? 'bg-os-accent/10 text-os-text border border-os-accent/15 rounded-tr-sm'
-                        : 'bg-white/[0.03] text-os-text border border-os-border rounded-tl-sm'
+                        : (msg as any).isError
+                          ? 'bg-os-danger/5 text-os-danger border border-os-danger/20 rounded-tl-sm'
+                          : 'bg-white/[0.03] text-os-text border border-os-border rounded-tl-sm'
                     )}>
                       {msg.content}
                     </div>
                   </div>
                 ))}
 
-                {/* Streaming response */}
-                {isStreaming && (
+                {/* Thinking indicator — waiting for first token */}
+                {isThinking && !streamingText && (
+                  <div className="flex gap-2 sm:gap-3">
+                    <div className="w-7 h-7 rounded-full bg-os-surface border border-os-accent/30 flex items-center justify-center flex-shrink-0 shadow-[0_0_8px_rgba(100,255,218,0.15)]">
+                      <Sparkles className="w-3.5 h-3.5 text-os-accent animate-pulse" />
+                    </div>
+                    <div className="p-3 bg-white/[0.03] border border-os-border rounded-xl rounded-tl-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-os-muted">
+                          {aiProvider === 'chatgpt' ? 'ChatGPT' : 'Claude'} is thinking
+                        </span>
+                        <span className="flex gap-0.5">
+                          {[0, 1, 2].map(i => (
+                            <span key={i} className="inline-block w-1 h-1 rounded-full bg-os-accent/70"
+                              style={{ animation: 'thinkDot 1.2s ease-in-out infinite', animationDelay: `${i * 0.2}s` }} />
+                          ))}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Streaming response — text appearing */}
+                {isStreaming && streamingText && (
                   <div className="flex gap-2 sm:gap-3">
                     <div className="w-7 h-7 rounded-full bg-os-surface border border-os-border flex items-center justify-center flex-shrink-0">
                       <Bot className="w-3.5 h-3.5 text-os-text" />
                     </div>
                     <div className="max-w-[80%] sm:max-w-[75%] p-3 bg-white/[0.03] border border-os-border rounded-xl rounded-tl-sm text-sm font-mono leading-relaxed text-os-text whitespace-pre-wrap">
-                      {streamingText || (
-                        <div className="flex gap-1 items-center py-0.5">
-                          {[0, 1, 2].map(i => (
-                            <div key={i} className="w-1.5 h-1.5 rounded-full bg-os-accent/60 animate-bounce"
-                              style={{ animationDelay: `${i * 0.15}s` }} />
-                          ))}
-                        </div>
-                      )}
-                      {streamingText && (
-                        <span className="inline-block w-0.5 h-3.5 bg-os-accent/70 ml-0.5 animate-pulse align-text-bottom" />
-                      )}
+                      {streamingText}
+                      <span className="inline-block w-0.5 h-3.5 bg-os-accent ml-0.5 animate-pulse align-text-bottom" />
                     </div>
                   </div>
                 )}
@@ -185,24 +204,47 @@ export default function AiPage() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-os-border p-3 sm:p-4">
+          <div className="border-t border-os-border p-3 sm:p-4 space-y-2">
+            {/* Provider toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-os-muted">AI:</span>
+              <div className="flex rounded-lg border border-os-border overflow-hidden">
+                {(['chatgpt', 'claude'] as AiProvider[]).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setAiProvider(p)}
+                    className={cn(
+                      'px-3 py-1 text-[10px] font-mono tracking-wide transition-all',
+                      aiProvider === p
+                        ? p === 'chatgpt'
+                          ? 'bg-green-500/20 text-green-400 border-r border-os-border'
+                          : 'bg-os-accent/15 text-os-accent'
+                        : 'text-os-muted hover:text-os-text border-r last:border-r-0 border-os-border'
+                    )}
+                  >
+                    {p === 'chatgpt' ? '✦ ChatGPT' : '◆ Claude'}
+                  </button>
+                ))}
+              </div>
+              {messages.length > 0 && !isStreaming && (
+                <button onClick={clearHistory} title="Clear chat"
+                  className="ml-auto text-os-muted hover:text-os-text transition-colors p-1">
+                  <RefreshCw className="w-3 h-3" />
+                </button>
+              )}
+            </div>
             <div className="flex gap-2 sm:gap-3">
               <input
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                placeholder="Ask your AI chief of staff..."
+                placeholder={`Ask ${aiProvider === 'chatgpt' ? 'ChatGPT' : 'Claude'} anything...`}
                 className="flex-1 os-input text-sm"
                 disabled={isStreaming}
               />
               <Button onClick={handleSend} loading={isStreaming} disabled={!input.trim()}>
                 <Send className="w-3 h-3" />
               </Button>
-              {messages.length > 0 && !isStreaming && (
-                <Button variant="ghost" onClick={clearHistory} title="Clear chat">
-                  <RefreshCw className="w-3 h-3" />
-                </Button>
-              )}
             </div>
           </div>
         </Card>

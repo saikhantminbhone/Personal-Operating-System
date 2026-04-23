@@ -110,8 +110,8 @@ export const analyticsApi = {
 // ── AI ────────────────────────────────────────────────────────────────────────
 export const aiApi = {
   briefing: () => api.get('/ai/briefing'),
-  chat: (message: string, conversationHistory?: any[]) =>
-    api.post('/ai/chat', { message, conversationHistory }),
+  chat: (message: string, conversationHistory?: any[], provider?: string) =>
+    api.post('/ai/chat', { message, conversationHistory, provider }),
   chatHistory: () => api.get('/ai/chat/history'),
   // Phase 2 intelligence
   categorizeTransaction: (description: string, amount: number, type: string) =>

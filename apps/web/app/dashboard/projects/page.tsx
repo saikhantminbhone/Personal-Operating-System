@@ -9,7 +9,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, Select } from '@/components/ui/Input'
 import { useAppStore } from '@/store/useAppStore'
 import { useGoals } from '@/hooks/useGoals'
-import { PILLAR_META, formatDate } from '@/lib/utils'
+import { PILLAR_META, ENERGY_META, PRIORITY_META, formatDate } from '@/lib/utils'
 import { FolderKanban, Plus, Trash2, LayoutGrid, List, ArrowLeft, ChevronRight } from 'lucide-react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 
@@ -32,6 +32,10 @@ export default function ProjectsPage() {
   const [activeProject, setActiveProject] = useState<any>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', goalId: '', targetDate: '', color: '#64ffda' })
+  const [addTaskOpen, setAddTaskOpen] = useState(false)
+  const [addTaskStatus, setAddTaskStatus] = useState('TODO')
+  const todayISO = new Date().toISOString().slice(0, 10)
+  const [taskForm, setTaskForm] = useState({ title: '', priority: 'MEDIUM', energyRequired: 2, dueDate: todayISO })
   const { confirm, dialog: confirmDialog } = useConfirm()
 
   const { data: projects, isLoading } = useQuery<any[]>({
@@ -61,9 +65,25 @@ export default function ProjectsPage() {
   })
 
   const moveTask = useMutation({
-    mutationFn: ({ taskId, status }: any) => api.patch(`/tasks/${taskId}`, { status }),
+    mutationFn: ({ taskId, body }: { taskId: string; body: any }) =>
+      api.patch(`/tasks/${taskId}`, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', 'kanban'] }),
   })
+
+  const createProjectTask = useMutation({
+    mutationFn: (data: any) => api.post('/tasks', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects', 'kanban'] })
+      setAddTaskOpen(false)
+      setTaskForm({ title: '', priority: 'MEDIUM', energyRequired: 2, dueDate: todayISO })
+      showToast('Task added ✓')
+    },
+    onError: (err: any) => showToast(err.message || 'Failed to add task', 'error'),
+  })
+
+  const STATUS_TO_TASK: Record<string, string> = {
+    BACKLOG: 'TODO', TODO: 'TODO', IN_PROGRESS: 'IN_PROGRESS', DONE: 'DONE',
+  }
 
   // Build kanban columns from API response
   const kanbanColumns = KANBAN_COLS.map(col => ({
@@ -102,16 +122,73 @@ export default function ProjectsPage() {
           <KanbanBoard
             columns={kanbanColumns}
             loading={kanbanLoading}
+            onAddTask={(colKey) => {
+              setAddTaskStatus(colKey)
+              setAddTaskOpen(true)
+            }}
             onTaskMove={async (taskId, newStatus) => {
-              // Map kanban col key to task status
-              const statusMap: Record<string, string> = {
-                BACKLOG: 'TODO', TODO: 'TODO', IN_PROGRESS: 'IN_PROGRESS', DONE: 'DONE'
+              const body: any = { status: STATUS_TO_TASK[newStatus] || newStatus }
+              // Moving to BACKLOG: clear dueDate so it stays in BACKLOG (no date = backlog)
+              if (newStatus === 'BACKLOG') body.clearDueDate = true
+              // Moving to TODO: needs a dueDate to appear in TODO col — use today if none
+              if (newStatus === 'TODO') {
+                const task = kanbanColumns.flatMap(c => c.tasks).find(t => t.id === taskId)
+                if (!task?.dueDate) body.dueDate = new Date().toISOString().slice(0, 10)
               }
-              await moveTask.mutateAsync({ taskId, status: statusMap[newStatus] || newStatus })
+              await moveTask.mutateAsync({ taskId, body })
               showToast('Task moved ✓')
             }}
           />
         </div>
+
+        {/* Add Task Modal */}
+        <Modal open={addTaskOpen} onClose={() => setAddTaskOpen(false)} title={`Add Task — ${addTaskStatus}`}>
+          <div className="space-y-4">
+            <Input label="Task Title" placeholder="What needs to be done?"
+              value={taskForm.title} autoFocus
+              onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && taskForm.title.trim()) {
+                  createProjectTask.mutate({
+                    title: taskForm.title,
+                    projectId: activeProject.id,
+                    priority: taskForm.priority,
+                    energyRequired: taskForm.energyRequired,
+                    dueDate: taskForm.dueDate || undefined,
+                    status: STATUS_TO_TASK[addTaskStatus] || 'TODO',
+                  })
+                }
+              }}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Select label="Priority" value={taskForm.priority}
+                onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value }))}>
+                {Object.keys(PRIORITY_META).map(p => <option key={p} value={p}>{p}</option>)}
+              </Select>
+              <Select label="Energy" value={String(taskForm.energyRequired)}
+                onChange={e => setTaskForm(f => ({ ...f, energyRequired: Number(e.target.value) }))}>
+                {ENERGY_META.map((e, i) => <option key={i} value={i}>{e.icon} {e.label}</option>)}
+              </Select>
+            </div>
+            <Input label="Due Date" type="date" value={taskForm.dueDate}
+              onChange={e => setTaskForm(f => ({ ...f, dueDate: e.target.value }))} />
+            <div className="flex gap-3 pt-2">
+              <Button className="flex-1" loading={createProjectTask.isPending}
+                disabled={!taskForm.title.trim()}
+                onClick={() => createProjectTask.mutate({
+                  title: taskForm.title,
+                  projectId: activeProject.id,
+                  priority: taskForm.priority,
+                  energyRequired: taskForm.energyRequired,
+                  dueDate: taskForm.dueDate || undefined,
+                  status: STATUS_TO_TASK[addTaskStatus] || 'TODO',
+                })}>
+                Add Task
+              </Button>
+              <Button variant="ghost" onClick={() => setAddTaskOpen(false)}>Cancel</Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     )
   }
