@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "pages:preview": "wrangler pages dev out",
-    "pages:deploy": "wrangler pages deploy out --project-name=saikhant-labs-os-marketing"
+    "cf:deploy": "npx wrangler deploy",
+    "cf:preview": "npx wrangler dev"
   },
   "dependencies": {
     "clsx": "^2.1.0",
@@ -25,7 +25,6 @@
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
-    "typescript": "^5.4.5",
-    "wrangler": "^3.78.0"
+    "typescript": "^5.4.5"
   }
 }

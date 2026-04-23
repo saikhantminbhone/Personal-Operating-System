@@ -1,3 +1,8 @@
-name = "saikhant-labs-os-marketing"
+name = "personal-os-marketing"
 compatibility_date = "2024-09-23"
-pages_build_output_dir = "out"
+
+# Workers + Static Assets: no worker script, just serve the static export
+# from Next.js (`out/`) as assets. `wrangler deploy` uploads the folder.
+[assets]
+directory = "./out"
+not_found_handling = "404-page"
